@@ -65,5 +65,5 @@ This is the initial planning stage.
 Backend & frontend development will start soon.
 
 ## 👤 Author
-Your Name  
-GitHub: https://github.com/your-name
+tammoihoc
+GitHub: https://github.com/tammoihoc
