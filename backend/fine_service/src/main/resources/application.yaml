@@ -1,0 +1,67 @@
+server:
+  port: 8086
+spring:
+  application:
+    name: fine-service
+  
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/university_digital_library?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+    open-in-view: false
+  
+  cloud:
+    consul:
+      host: localhost
+      port: 8500
+      discovery:
+        enabled: true
+        register: true
+        instance-id: ${spring.application.name}:${server.port}
+        hostname: localhost
+        ip-address: 127.0.0.1
+        prefer-ip-address: true
+        health-check-path: /actuator/health
+        health-check-interval: 30s
+        health-check-timeout: 10s
+        health-check-url: http://localhost:${server.port}/actuator/health
+        tags:
+          - "microservice"
+          - "fine"
+        metadata:
+          version: "1.0"
+          environment: "development"
+# fine-service/src/main/resources/application.yml
+# Thêm vào cuối file
+
+security:
+  jwt:
+    secret: "mySuperSecretKeyForJWTGenerationThatIsAtLeast32CharactersLong"
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+logging:
+  level:
+    com.university_digital_library.fine_service: DEBUG

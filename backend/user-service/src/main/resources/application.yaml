@@ -1,0 +1,79 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: user-service
+  
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/university_digital_library?usessl=false&servertimezone=utc&allowpublickeyretrieval=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+  
+  cloud:
+    consul:
+      host: localhost
+      port: 8500
+      discovery:
+        enabled: true
+        register: true
+        instance-id: ${spring.application.name}:${server.port}
+        # thêm các cấu hình sau để fix lỗi hostname
+        hostname: localhost                    # dùng localhost thay vì archlinux
+        ip-address: 127.0.0.1                  # dùng ip trực tiếp
+        prefer-ip-address: true                # ưu tiên dùng ip
+        # cấu hình health check đúng cách
+        health-check-path: /actuator/health
+        health-check-interval: 30s
+        health-check-timeout: 10s
+        # dùng localhost trong health check url
+        health-check-url: http://localhost:${server.port}/actuator/health
+        # metadata (optional)
+        metadata:
+          secure: "false"
+          version: "1.0"
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+security:
+  jwt:
+    secret: "mySuperSecretKeyForJWTGenerationThatIsAtLeast32CharactersLong"
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+    info:
+      enabled: true
+    metrics:
+      enabled: true
+# Thêm vào cuối file
+file:
+  upload:
+    avatar-dir: ./uploads/avatars
+    max-file-size: 5MB
+    allowed-extensions: .jpg,.jpeg,.png,.webp
+
+
+logging:
+  level:
+    com.university_digital_library.user_service: debug
+    org.hibernate.sql: debug
+    org.springframework.cloud.consul: debug

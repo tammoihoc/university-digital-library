@@ -1,0 +1,91 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: borrow-service
+  
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/university_digital_library?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 20
+          fetch_size: 50
+    open-in-view: false
+  
+  cloud:
+    consul:
+      host: localhost
+      port: 8500
+      discovery:
+        enabled: true
+        register: true
+        instance-id: ${spring.application.name}:${server.port}
+        hostname: localhost
+        ip-address: 127.0.0.1
+        prefer-ip-address: true
+        health-check-path: /actuator/health
+        health-check-interval: 30s
+        health-check-timeout: 10s
+        health-check-url: http://localhost:${server.port}/actuator/health
+        health-check-critical-timeout: 2m
+        tags:
+          - "microservice"
+          - "borrow"
+        metadata:
+          version: "1.0"
+          environment: "development"
+# borrow-service/src/main/resources/application.yml
+security:
+  jwt:
+    secret: "mySuperSecretKeyForJWTGenerationThatIsAtLeast32CharactersLong"
+# Feign Client Configuration
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000
+        readTimeout: 5000
+        loggerLevel: basic
+  circuitbreaker:
+    enabled: true
+
+# Management Endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+    metrics:
+      enabled: true
+# borrow-service/src/main/resources/application.yml
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+    com.university_digital_library: DEBUG
+# Borrow Service Specific Config
+borrow:
+  max-days: 14  # Số ngày mượn tối đa
+  fine-per-day: 5000  # Phí quá hạn/ngày (VNĐ)
+  max-books-per-user: 5  # Số sách tối đa/user

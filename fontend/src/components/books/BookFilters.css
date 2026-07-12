@@ -1,0 +1,63 @@
+/* Book Filters Styles */
+.filter-container {
+  border-top: 1px solid var(--border-color);
+  padding-top: 20px;
+}
+
+.filter-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.filter-header h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--hutech-primary-dark);
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.filter-btn:hover {
+  background: rgba(0, 85, 165, 0.05);
+  border-color: var(--hutech-primary-light);
+}
+
+.filter-btn.active {
+  background: linear-gradient(135deg, var(--hutech-primary), var(--hutech-primary-dark));
+  color: white;
+  border-color: var(--hutech-primary);
+  box-shadow: 0 4px 12px rgba(0, 85, 165, 0.2);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .filter-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .filter-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
