@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: library-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # MySQL tự động chạy mọi file .sql trong thư mục này
+      # theo thứ tự tên file, NHƯNG CHỈ chạy 1 LẦN DUY NHẤT
+      # lúc volume mysql-data còn trống (lần khởi tạo đầu tiên).
+      - ./docker/mysql-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpass"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+networks:
+  default:
+    name: library-net
+
+volumes:
+  mysql-data:

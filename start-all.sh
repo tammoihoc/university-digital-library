@@ -1,5 +1,4 @@
 #!/bin/bash
-# ==============================================================
 # start-all.sh — Quản lý khởi động các Spring Boot service
 #
 # CÁCH DÙNG:
@@ -19,7 +18,6 @@
 #     Nếu code không đổi -> bỏ qua build, chạy thẳng jar có sẵn cho nhanh.
 #   - Nếu service đang chạy rồi (theo dõi qua file PID) -> không khởi
 #     động lại, tránh chạy trùng 2 instance của cùng 1 service.
-# ==============================================================
 
 set -uo pipefail
 

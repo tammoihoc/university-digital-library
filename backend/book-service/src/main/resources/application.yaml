@@ -6,9 +6,9 @@ spring:
     name: book-service
   
   datasource:
-    url: jdbc:mysql://127.0.0.1:3306/university_digital_library?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-    username: root
-    password: root
+    url: jdbc:mysql://127.0.0.1:3306/book_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: book_user
+    password: book_pass
     driver-class-name: com.mysql.cj.jdbc.Driver
   
   jpa:
@@ -19,13 +19,12 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
-
+  
   servlet:
     multipart:
       max-file-size: 50MB
       max-request-size: 50MB
-      enabled: true
-      
+  
   cloud:
     consul:
       host: localhost
@@ -41,24 +40,18 @@ spring:
         health-check-interval: 30s
         health-check-timeout: 10s
 
-# JWT Configuration - PHẢI GIỐNG VỚI AUTH SERVICE
 security:
   jwt:
     secret: "mySuperSecretKeyForJWTGenerationThatIsAtLeast32CharactersLong"
+  aes:
+    secret-key: "MDEyMzQ1Njc4OWFiY2RlZmdoaWprbG1ub3BxcnN0dXY="
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info,metrics
-      base-path: /actuator
-  endpoint:
-    health:
-      show-details: always
-    metrics:
-      enabled: true
 
 logging:
   level:
-    com.university_digital_library.book_service: DEBUG
-    org.springframework.security: INFO
+    com.university: DEBUG

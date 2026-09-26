@@ -1,7 +1,6 @@
-// user-service/src/main/java/.../security/JwtAuthFilter.java
 package com.university_digital_library.user_service.security;
 
-import com.university_digital_library.user_service.util.JwtUtil;
+import com.university_digital_library.common_library.security.JwtService;  // ✅ SỬA IMPORT
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -25,7 +24,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class JwtAuthFilter extends OncePerRequestFilter {
     
-    private final JwtUtil jwtUtil;
+    private final JwtService jwtService;  // ✅ SỬA
     
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -43,23 +42,20 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         final String token = authHeader.substring(7);
         
         try {
-            if (jwtUtil.validateToken(token)) {
-                Claims claims = jwtUtil.getClaims(token);
-                String username = claims.getSubject();
+            if (jwtService.validateToken(token)) {
+                String username = jwtService.extractUsername(token);
+                List<String> roles = jwtService.extractRoles(token);
                 
-@SuppressWarnings("unchecked")
-List<String> roles = claims.get("roles", List.class);
-List<SimpleGrantedAuthority> authorities = roles.stream()
-        .map(role -> {
-            // ✅ THÊM PREFIX ROLE_ NẾU CHƯA CÓ
-            if (!role.startsWith("ROLE_")) {
-                return new SimpleGrantedAuthority("ROLE_" + role);
-            }
-            return new SimpleGrantedAuthority(role);
-        })
-        .collect(Collectors.toList());
-
-log.info("Authorities created: {}", authorities);
+                List<SimpleGrantedAuthority> authorities = roles.stream()
+                    .map(role -> {
+                        if (!role.startsWith("ROLE_")) {
+                            return new SimpleGrantedAuthority("ROLE_" + role);
+                        }
+                        return new SimpleGrantedAuthority(role);
+                    })
+                    .collect(Collectors.toList());
+                
+                log.info("User Service - Authorities created: {}", authorities);
                 
                 if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UsernamePasswordAuthenticationToken authToken =
@@ -67,7 +63,7 @@ log.info("Authorities created: {}", authorities);
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                     
-                    log.debug("Authenticated user: {} with roles: {}", username, roles);
+                    log.debug("User Service - Authenticated user: {} with roles: {}", username, roles);
                 }
             }
         } catch (Exception e) {

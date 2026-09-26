@@ -1,9 +1,9 @@
-// auth-service/src/main/java/.../config/DataInitializer.java
 package com.university_digital_library.auth_service.config;
 
 import com.university_digital_library.auth_service.model.User;
 import com.university_digital_library.auth_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +13,7 @@ import java.util.Set;
 
 @Configuration
 @RequiredArgsConstructor
+@Slf4j
 public class DataInitializer {
 
     private final PasswordEncoder passwordEncoder;
@@ -50,11 +51,11 @@ public class DataInitializer {
                 userRepository.save(librarian);
                 userRepository.save(lecturer);
 
-                System.out.println("Default users created!");
-                System.out.println("  - admin / admin123 (ADMIN)");
-                System.out.println("  - student / 123456 (STUDENT)");
-                System.out.println("  - librarian / lib123 (LIBRARIAN)");
-                System.out.println("  - lecturer / lec123 (LECTURER)");
+                log.info("Default users created!");
+                log.info("  - admin / admin123 (ADMIN)");
+                log.info("  - student / 123456 (STUDENT)");
+                log.info("  - librarian / lib123 (LIBRARIAN)");
+                log.info("  - lecturer / lec123 (LECTURER)");
             }
         };
     }

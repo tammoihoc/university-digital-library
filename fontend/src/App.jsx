@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import LibrarianRoute from './components/auth/LibrarianRoute';
 import Login from './pages/auth/Login';
+import ForgotPassword from './pages/auth/ForgotPassword';
 import Dashboard from './pages/dashboard/Dashboard';
 import BookDetail from './pages/book/BookDetail';
 import Profile from './pages/profile/Profile';
@@ -50,6 +51,7 @@ function App() {
         <div className="App">
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             
             {/* Student Routes */}
             <Route 

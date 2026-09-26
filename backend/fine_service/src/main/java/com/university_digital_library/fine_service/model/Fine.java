@@ -1,12 +1,33 @@
-// /home/tam/university-digital-library/backend/fine-service/src/main/java/com/university_digital_library/fine_service/model/Fine.java
+// fine-service/src/main/java/com/university_digital_library/fine_service/model/Fine.java
 package com.university_digital_library.fine_service.model;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "fines")
-public class Fine {
+@Table(
+    name = "fine_records",
+    indexes = {
+        // Phủ findByUserId + findByUserIdAndIsPaidFalse (user_id là cột đầu).
+        @Index(name = "idx_fine_user_paid", columnList = "user_id, is_paid"),
+        // Phủ findByIsPaidFalse/True, countByIsPaidFalse, sumUnpaidFines, và
+        // findByCreatedAtBeforeAndIsPaidFalse (is_paid = điều kiện bằng nên
+        // đặt trước created_at là điều kiện khoảng, đúng nguyên tắc composite index).
+        @Index(name = "idx_fine_unpaid_created", columnList = "is_paid, created_at"),
+        // Phủ findByCreatedAtBetween khi không lọc theo is_paid.
+        @Index(name = "idx_fine_created_at", columnList = "created_at")
+    }
+)
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Fine {  // ✅ ĐỔI TÊN CLASS THÀNH Fine (không phải FineRecord)
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -17,107 +38,44 @@ public class Fine {
     
     private Long borrowId;
     
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private PenaltyType penaltyType;
+    
     @Column(nullable = false)
     private Double amount;
     
-    @Enumerated(EnumType.STRING)
-    private PenaltyType penaltyType;
-    
     private String reason;
     
-    private Boolean isPaid;
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean isPaid = false;
     
     private LocalDateTime paidAt;
     
-    private LocalDateTime createdAt;
+    @Column(nullable = false)
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
     
     private String createdBy;
+    
+    // Damage fields
+    @Enumerated(EnumType.STRING)
+    private DamageType damageType;
+    private Double bookPrice;
+    private String damageDescription;
     
     public enum PenaltyType {
         MONEY, COMMUNITY_SERVICE, BAN_TEMPORARY, WARNING
     }
     
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        if (isPaid == null) {
-            isPaid = false;
-        }
-        if (penaltyType == null) {
-            penaltyType = PenaltyType.MONEY;
-        }
-    }
-    
-    // Constructors
-    public Fine() {}
-    
-    public Fine(String userId, Long borrowId, Double amount, String reason) {
-        this.userId = userId;
-        this.borrowId = borrowId;
-        this.amount = amount;
-        this.reason = reason;
-        this.penaltyType = PenaltyType.MONEY;
-        this.isPaid = false;
-    }
-    
-    // Getters and Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    
-    public String getUserId() { return userId; }
-    public void setUserId(String userId) { this.userId = userId; }
-    
-    public Long getBorrowId() { return borrowId; }
-    public void setBorrowId(Long borrowId) { this.borrowId = borrowId; }
-    
-    public Double getAmount() { return amount; }
-    public void setAmount(Double amount) { this.amount = amount; }
-    
-    public PenaltyType getPenaltyType() { return penaltyType; }
-    public void setPenaltyType(PenaltyType penaltyType) { this.penaltyType = penaltyType; }
-    
-    public String getReason() { return reason; }
-    public void setReason(String reason) { this.reason = reason; }
-    
-    public Boolean getIsPaid() { return isPaid; }
-    public void setIsPaid(Boolean isPaid) { this.isPaid = isPaid; }
-    
-    public LocalDateTime getPaidAt() { return paidAt; }
-    public void setPaidAt(LocalDateTime paidAt) { this.paidAt = paidAt; }
-    
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-    
-    public String getCreatedBy() { return createdBy; }
-    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
-        @Enumerated(EnumType.STRING)
-    private DamageType damageType;  // Loại hư hỏng
-    
-    private Double bookPrice;        // Giá gốc sách
-    
-    private String damageDescription; // Mô tả hư hỏng
-    
     public enum DamageType {
         LOST("Mất sách"),
-        DAMAGED_HEAVY("Hư hỏng nặng - không phục hồi được"),
-        DAMAGED_LIGHT("Hư hỏng nhẹ - có thể phục hồi");
+        DAMAGED_HEAVY("Hư hỏng nặng"),
+        DAMAGED_LIGHT("Hư hỏng nhẹ");
         
         private final String description;
-        
-        DamageType(String description) {
-            this.description = description;
-        }
-        
+        DamageType(String description) { this.description = description; }
         public String getDescription() { return description; }
     }
-    
-    // Getters and Setters
-    public DamageType getDamageType() { return damageType; }
-    public void setDamageType(DamageType damageType) { this.damageType = damageType; }
-    
-    public Double getBookPrice() { return bookPrice; }
-    public void setBookPrice(Double bookPrice) { this.bookPrice = bookPrice; }
-    
-    public String getDamageDescription() { return damageDescription; }
-    public void setDamageDescription(String damageDescription) { this.damageDescription = damageDescription; }
 }

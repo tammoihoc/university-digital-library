@@ -1,16 +1,14 @@
 // src/components/common/Navbar.jsx
-import React, { useState, useEffect } from 'react';  // ✅ THÊM useEffect
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { 
   Sun, Moon, Globe, Bell, Menu, X, 
   BookOpen, Library, Star, Clock, LogOut,
   LayoutDashboard, RefreshCw, BarChart3, Users, BookMarked, 
-  MapPin, DollarSign, TrendingUp
+  MapPin, DollarSign, TrendingUp, User, Camera, Key, ChevronDown
 } from 'lucide-react';
 import authService from '../../services/authService.jsx';
 import userService from '../../services/userService.jsx';
-
-// Import ảnh logo
 import logoImage from '../../assets/logo.png';
 import './Navbar.css';
 
@@ -26,21 +24,31 @@ const Navbar = ({
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(null);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef(null);
 
   const isLibrarian = authService.isLibrarian();
   const isStudent = authService.isStudent();
   const isAdmin = authService.isAdmin();
 
-  // ✅ THÊM useEffect để load avatar
   useEffect(() => {
     if (user?.username) {
       loadAvatar();
     }
   }, [user]);
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const loadAvatar = async () => {
     if (!user?.username) return;
-    
     try {
       const url = await userService.getAvatarUrl(user.username);
       setAvatarUrl(url);
@@ -56,10 +64,10 @@ const Navbar = ({
     } else {
       navigate('/dashboard');
     }
-    window.location.reload();
   };
 
   const handleUserProfileClick = () => {
+    setShowDropdown(false);
     if (onAvatarClick) {
       onAvatarClick();
     } else {
@@ -67,8 +75,8 @@ const Navbar = ({
     }
   };
 
-  const handleLogoutClick = (e) => {
-    e.stopPropagation();
+  const handleLogoutClick = () => {
+    setShowDropdown(false);
     if (onLogout) {
       onLogout();
     }
@@ -79,6 +87,43 @@ const Navbar = ({
     e.target.style.display = 'none';
     const container = e.target.parentElement;
     container.innerHTML = '<div class="brand-logo-fallback">HUTECH</div>';
+  };
+
+  const handleDropdownToggle = () => {
+    setShowDropdown(!showDropdown);
+  };
+
+  // Hàm xử lý đổi avatar (mở file input)
+  const handleChangeAvatar = () => {
+    setShowDropdown(false);
+    // Gửi sự kiện để component cha xử lý
+    if (onAvatarClick) {
+      onAvatarClick();
+    } else {
+      // Nếu không có hàm từ cha, mở file input mặc định
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/jpeg,image/png,image/jpg,image/webp';
+      fileInput.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          await userService.uploadAvatar(user.username, file);
+          const newAvatar = await userService.getAvatarUrl(user.username);
+          setAvatarUrl(newAvatar);
+          // Cập nhật localStorage
+          const storedUser = authService.getUser();
+          if (storedUser) {
+            authService.saveUser({ ...storedUser, avatar: newAvatar });
+          }
+          alert('✅ Ảnh đại diện đã được cập nhật!');
+          window.location.reload();
+        } catch (error) {
+          alert('❌ Upload avatar thất bại: ' + error.message);
+        }
+      };
+      fileInput.click();
+    }
   };
 
   return (
@@ -172,13 +217,9 @@ const Navbar = ({
             <span className="notification-badge">3</span>
           </button>
           
-          <div 
-            className="user-profile-container" 
-            onClick={handleUserProfileClick}
-            style={{ cursor: 'pointer' }}
-          >
-            <div className="user-profile">
-              <div className="avatar-container" title="Xem hồ sơ">
+          <div className="user-profile-container" ref={dropdownRef}>
+            <div className="user-profile" onClick={handleDropdownToggle}>
+              <div className="avatar-container">
                 {avatarUrl ? (
                   <img 
                     src={avatarUrl} 
@@ -201,14 +242,26 @@ const Navbar = ({
                 </span>
               </div>
               
-              <button 
-                className="logout-btn" 
-                onClick={handleLogoutClick}
-                title="Đăng xuất"
-              >
-                <LogOut size={16} />
-              </button>
+              <ChevronDown size={16} className={`dropdown-arrow ${showDropdown ? 'rotate' : ''}`} />
             </div>
+            
+            {showDropdown && (
+              <div className="user-dropdown">
+                <button className="dropdown-item" onClick={handleUserProfileClick}>
+                  <User size={16} /> Hồ sơ cá nhân
+                </button>
+                <button className="dropdown-item" onClick={handleChangeAvatar}>
+                  <Camera size={16} /> Đổi ảnh đại diện
+                </button>
+                <button className="dropdown-item" onClick={() => navigate('/change-password')}>
+                  <Key size={16} /> Đổi mật khẩu
+                </button>
+                <hr className="dropdown-divider" />
+                <button className="dropdown-item logout" onClick={handleLogoutClick}>
+                  <LogOut size={16} /> Đăng xuất
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

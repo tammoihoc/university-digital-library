@@ -1,8 +1,8 @@
-// borrow-service/src/main/java/.../dto/ReservationResponse.java
 package com.university_digital_library.borrow_service.dto;
 
 import com.university_digital_library.borrow_service.model.Reservation;
 import lombok.Data;
+
 import java.time.LocalDateTime;
 
 @Data
@@ -20,20 +20,20 @@ public class ReservationResponse {
     private Integer queuePosition;
     private LocalDateTime confirmedAt;
     private String confirmedBy;
-    
+
     public static ReservationResponse fromEntity(Reservation reservation) {
         ReservationResponse response = new ReservationResponse();
         if (reservation != null) {
-            response.id = reservation.getId();
-            response.userId = reservation.getUserId();
-            response.bookId = reservation.getBookId();
-            response.reservationDate = reservation.getReservationDate();
-            response.pickupDate = reservation.getPickupDate();
-            response.expiryDate = reservation.getExpiryDate();
-            response.status = reservation.getStatus() != null ? reservation.getStatus().name() : "PENDING";
-            response.notes = reservation.getNotes();
-            response.confirmedAt = reservation.getConfirmedAt();
-            response.confirmedBy = reservation.getConfirmedBy();
+            response.setId(reservation.getId());
+            response.setUserId(reservation.getUserId());
+            response.setBookId(reservation.getBookId());
+            response.setReservationDate(reservation.getReservationDate());
+            response.setPickupDate(reservation.getPickupDate());
+            response.setExpiryDate(reservation.getExpiryDate());
+            response.setStatus(reservation.getStatus() != null ? reservation.getStatus().name() : "PENDING");
+            response.setNotes(reservation.getNotes());
+            response.setConfirmedAt(reservation.getConfirmedAt());
+            response.setConfirmedBy(reservation.getConfirmedBy());
         }
         return response;
     }

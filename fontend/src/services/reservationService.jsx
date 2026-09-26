@@ -1,36 +1,55 @@
-const API_BASE = 'http://localhost:8080/api/reservations';
+const API_BASE = 'http://localhost:8080/api/borrows'; // sửa thành /borrows
 
 const reservationService = {
-  async createReservation(bookId, notes) {
+  // ✅ Tạo đặt trước với pickupDate
+  async createReservation(bookId, pickupDate, notes) {
     try {
       const token = localStorage.getItem('token');
-      const userStr = localStorage.getItem('user');
-      const user = userStr ? JSON.parse(userStr) : {};
-      
-      const response = await fetch(`${API_BASE}`, {
+      if (!token) throw new Error('No token found');
+
+      const response = await fetch(`${API_BASE}/reservations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Id': user?.username || 'student',
-          'X-User-Type': user?.userType || 'STUDENT',
-          ...(token && { 'Authorization': `Bearer ${token}` })
+          'Authorization': `Bearer ${token}`
         },
         credentials: 'include',
-        body: JSON.stringify({ bookId, notes })
+        body: JSON.stringify({ bookId, pickupDate, notes })
       });
-      
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || 'Đặt lịch thất bại');
+      }
       return await response.json();
     } catch (error) {
       console.error('Error creating reservation:', error);
       throw error;
     }
   },
-
-  async getMyReservations() {
+// ✅ Xác nhận đặt trước (PENDING → CONFIRMED)
+async approveReservation(reservationId) {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE}/reservations/${reservationId}/approve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include'
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    console.error('Error approving reservation:', error);
+    throw error;
+  }
+},
+  async getConfirmedReservations() {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/my`, {
+      const response = await fetch(`${API_BASE}/reservations/all`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -38,7 +57,45 @@ const reservationService = {
         },
         credentials: 'include'
       });
-      
+      if (!response.ok) return [];
+      const all = await response.json();
+      return all.filter(r => r.status === 'CONFIRMED');
+    } catch (error) {
+      console.error('Error fetching confirmed reservations:', error);
+      return [];
+    }
+  },
+// ✅ Từ chối đặt trước (PENDING → CANCELLED)
+async rejectReservation(reservationId, reason = '') {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE}/reservations/${reservationId}/reject?reason=${encodeURIComponent(reason)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include'
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    console.error('Error rejecting reservation:', error);
+    throw error;
+  }
+},
+  // ✅ Lấy danh sách đặt trước của user hiện tại
+  async getMyReservations() {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/reservations/my`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        credentials: 'include'
+      });
       if (!response.ok) return [];
       return await response.json();
     } catch (error) {
@@ -47,10 +104,11 @@ const reservationService = {
     }
   },
 
+  // ✅ Hủy đặt trước
   async cancelReservation(reservationId, reason = '') {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/${reservationId}?reason=${encodeURIComponent(reason)}`, {
+      const response = await fetch(`${API_BASE}/reservations/${reservationId}?reason=${encodeURIComponent(reason)}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -58,7 +116,6 @@ const reservationService = {
         },
         credentials: 'include'
       });
-      
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return await response.json();
     } catch (error) {
@@ -67,54 +124,50 @@ const reservationService = {
     }
   },
 
-  async pickupBook(reservationId) {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/${reservationId}/pickup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        },
-        credentials: 'include'
-      });
-      
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return await response.json();
-    } catch (error) {
-      console.error('Error picking up book:', error);
-      throw error;
-    }
-  },
-
+  // ✅ Xác nhận nhận sách (thủ thư)
+async confirmReservation(reservationId) {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE}/reservations/${reservationId}/confirm`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include'
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    console.error('Error confirming reservation:', error);
+    throw error;
+  }
+},
+  // ✅ Lấy tất cả đặt trước (admin/librarian)
   async getAllReservations() {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/all`, {
+      const response = await fetch(`${API_BASE}/reservations/all`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Id': 'librarian',
-          'X-User-Type': 'LIBRARIAN',
           ...(token && { 'Authorization': `Bearer ${token}` })
         },
         credentials: 'include'
       });
-      
       if (!response.ok) return [];
-      const data = await response.json();
-      console.log('All reservations response:', data);
-      return data;
+      return await response.json();
     } catch (error) {
       console.error('Error fetching all reservations:', error);
       return [];
     }
   },
 
+  // ✅ Lấy đặt trước theo sách
   async getReservationsByBook(bookId) {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/book/${bookId}`, {
+      const response = await fetch(`${API_BASE}/reservations/book/${bookId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -122,7 +175,6 @@ const reservationService = {
         },
         credentials: 'include'
       });
-      
       if (!response.ok) return [];
       return await response.json();
     } catch (error) {

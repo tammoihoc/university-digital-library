@@ -1,4 +1,4 @@
-// fine-service/src/main/java/.../service/FineService.java
+// fine-service/src/main/java/com/university_digital_library/fine_service/service/FineService.java
 package com.university_digital_library.fine_service.service;
 
 import com.university_digital_library.fine_service.dto.CreateFineRequest;
@@ -8,15 +8,24 @@ import java.util.List;
 import java.util.Map;
 
 public interface FineService {
+
     FineDTO createFine(CreateFineRequest request);
-    FineDTO markAsPaid(Long fineId);
+
+    FineDTO payFine(Long fineId);
+
     List<FineDTO> getAllFines();
+
     List<FineDTO> getUserFines(String userId);
-    List<FineDTO> getUnpaidFines();
+
+    List<FineDTO> getUnpaidFines(String userId);
+
+    List<FineDTO> getOverdueFines();
+
     Map<String, Object> getFineStats();
-    Double getTotalUnpaidAmount();
-    
-    // Thêm 2 method mới
-    FineDTO reportLoss(ReportDamageRequest request);
-    FineDTO reportDamage(ReportDamageRequest request);
+
+    Double getTotalUnpaidAmount();  // ✅ SỬA TÊN
+
+    FineDTO reportLoss(ReportDamageRequest request);  // ✅ SỬA TÊN
+
+    FineDTO reportDamage(ReportDamageRequest request); // ✅ ĐÃ ĐÚNG
 }

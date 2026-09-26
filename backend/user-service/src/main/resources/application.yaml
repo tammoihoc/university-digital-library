@@ -6,9 +6,9 @@ spring:
     name: user-service
   
   datasource:
-    url: jdbc:mysql://127.0.0.1:3306/university_digital_library?usessl=false&servertimezone=utc&allowpublickeyretrieval=true
-    username: root
-    password: root
+    url: jdbc:mysql://127.0.0.1:3306/user_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: user_user
+    password: user_pass
     driver-class-name: com.mysql.cj.jdbc.Driver
   
   jpa:
@@ -28,52 +28,46 @@ spring:
         enabled: true
         register: true
         instance-id: ${spring.application.name}:${server.port}
-        # thêm các cấu hình sau để fix lỗi hostname
-        hostname: localhost                    # dùng localhost thay vì archlinux
-        ip-address: 127.0.0.1                  # dùng ip trực tiếp
-        prefer-ip-address: true                # ưu tiên dùng ip
-        # cấu hình health check đúng cách
+        hostname: localhost
+        ip-address: 127.0.0.1
+        prefer-ip-address: true
         health-check-path: /actuator/health
         health-check-interval: 30s
         health-check-timeout: 10s
-        # dùng localhost trong health check url
-        health-check-url: http://localhost:${server.port}/actuator/health
-        # metadata (optional)
-        metadata:
-          secure: "false"
-          version: "1.0"
+  
   servlet:
     multipart:
       max-file-size: 5MB
       max-request-size: 10MB
+
 security:
   jwt:
     secret: "mySuperSecretKeyForJWTGenerationThatIsAtLeast32CharactersLong"
+  aes:
+    secret-key: "MDEyMzQ1Njc4OWFiY2RlZmdoaWprbG1ub3BxcnN0dXY="
+  blind-index:
+    # Khóa dùng để tính HMAC-SHA256 cho email/studentId/lecturerId (tra cứu +
+    # UNIQUE). PHẢI khác khóa AES ở trên — dùng chung khóa cho 2 mục đích
+    # (mã hóa 2 chiều và băm 1 chiều) là thực hành không tốt về mật mã học.
+    secret-key: "cXV5ZW4tZGFpLWhvYy10aHV2aWVuLXNvLWJsaW5kLWluZGV4LWtleQ=="
+  internal:
+    # ĐÃ THÊM — property này bị THIẾU hoàn toàn trước đây dù InternalServiceAuthFilter
+    # đọc nó bằng @Value("${security.internal.api-key}") không có giá trị mặc định.
+    # Spring Boot không resolve được placeholder này -> context khởi tạo LỖI ngay
+    # từ đầu -> service không lên được (biểu hiện ra ngoài là lỗi 503 qua Gateway,
+    # vì Gateway không tìm thấy instance nào registered để forward request tới).
+    # PHẢI giống hệt giá trị ở borrow-service và auth-service (2 service gọi Feign
+    # sang user-service) vì đây là secret dùng chung để service-to-service tin nhau.
+    api-key: "internal-service-shared-secret-key-CHANGE-ME-in-production"
+
 management:
   endpoints:
     web:
       exposure:
         include: health,info,metrics
       base-path: /actuator
-  endpoint:
-    health:
-      show-details: always
-      probes:
-        enabled: true
-    info:
-      enabled: true
-    metrics:
-      enabled: true
-# Thêm vào cuối file
-file:
-  upload:
-    avatar-dir: ./uploads/avatars
-    max-file-size: 5MB
-    allowed-extensions: .jpg,.jpeg,.png,.webp
-
 
 logging:
   level:
-    com.university_digital_library.user_service: debug
-    org.hibernate.sql: debug
-    org.springframework.cloud.consul: debug
+    com.university: DEBUG
+    org.springframework.security: DEBUG

@@ -1,10 +1,10 @@
-// entry-exit-service/src/main/java/.../controller/EntryExitController.java
 package com.university_digital_library.entry_exit_service.controller;
 
-import com.university_digital_library.entry_exit_service.dto.EntryResponseDTO;
-import com.university_digital_library.entry_exit_service.dto.EntryRecordDTO;
+import com.university_digital_library.entry_exit_service.dto.EntryExitRequest;
+import com.university_digital_library.entry_exit_service.dto.EntryExitResponse;
+import com.university_digital_library.entry_exit_service.model.EntryExitRecord;
 import com.university_digital_library.entry_exit_service.service.EntryExitService;
-import com.university_digital_library.entry_exit_service.service.LibraryHoursService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -16,110 +16,110 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/entry-exit")
 @RequiredArgsConstructor
 @Slf4j
 public class EntryExitController {
-    
+
     private final EntryExitService entryExitService;
-    private final LibraryHoursService libraryHoursService;
-    
-@PostMapping("/entry")
-@PreAuthorize("isAuthenticated()")
-public ResponseEntity<EntryResponseDTO> recordEntry(
-        @RequestHeader(value = "X-Branch", required = false, defaultValue = "B") String branch,
-        @RequestHeader("Authorization") String authorization,
-        Authentication auth) {
-    
-    if (!branch.equals("B") && !branch.equals("E")) {
-        throw new RuntimeException("Branch không hợp lệ! Chỉ chấp nhận B (Thư viện chính) hoặc E (Thư viện Quận 9)");
-    }
-    
-    String userId = auth.getName();
-    log.info("User {} entering library at branch {}", userId, branch);
-    
-    // ✅ Truyền token xuống service
-    EntryResponseDTO response = entryExitService.recordEntry(userId, branch, authorization);
-    return ResponseEntity.ok(response);
-}
-    
-// entry-exit-service/src/main/java/.../controller/EntryExitController.java
-// entry-exit-service/src/main/java/.../controller/EntryExitController.java
-@GetMapping("/current")
-@PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN')")
-public ResponseEntity<List<EntryResponseDTO>> getCurrentEntries(
-        @RequestHeader(value = "Authorization", required = false) String authorization,
-        HttpServletRequest request) {
-    
-    // ✅ LẤY TOKEN TỪ REQUEST NẾU AUTHORIZATION NULL
-    if (authorization == null) {
-        authorization = request.getHeader("Authorization");
-    }
-    
-    log.info("Authorization header in controller: {}", authorization != null ? "present (length=" + authorization.length() + ")" : "NULL");
-    
-    List<EntryResponseDTO> result = entryExitService.getCurrentEntriesWithUserInfo(authorization);
-    return ResponseEntity.ok(result);
-}
-    
-    @GetMapping("/history")
+
+    @PostMapping("/check-in")
     @PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN')")
-    public ResponseEntity<List<EntryRecordDTO>> getEntryHistory(
-            @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate) {
-        
-        if (startDate == null || endDate == null) {
-            java.time.LocalDate end = java.time.LocalDate.now();
-            java.time.LocalDate start = end.minusDays(7);
-            startDate = start.toString();
-            endDate = end.toString();
+    public ResponseEntity<EntryExitResponse> checkIn(
+            @Valid @RequestBody EntryExitRequest request,
+            Authentication auth,
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+
+        // Lấy identifier từ request (có thể là username hoặc studentId)
+        String identifier = request.getUserId();
+        if (identifier == null || identifier.isBlank()) {
+            identifier = auth != null ? auth.getName() : null;
         }
-        
-        return ResponseEntity.ok(entryExitService.getEntryHistory(startDate, endDate));
+        if (identifier == null) {
+            throw new RuntimeException("User ID is required");
+        }
+
+        log.info("User {} checking in at branch {}", identifier, request.getBranch());
+        EntryExitResponse response = entryExitService.checkIn(identifier, request, authorization);
+        return ResponseEntity.ok(response);
     }
-    
-    @GetMapping("/my-history")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<EntryRecordDTO>> getMyHistory(Authentication auth) {
-        String userId = auth.getName();
-        return ResponseEntity.ok(entryExitService.getUserHistory(userId));
+
+    @PostMapping("/check-out")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN')")
+    public ResponseEntity<EntryExitResponse> checkOut(
+            @RequestBody EntryExitRequest request,
+            Authentication auth) {
+
+        String userId = request.getUserId();
+        if (userId == null || userId.isBlank()) {
+            userId = auth != null ? auth.getName() : null;
+        }
+        if (userId == null) {
+            throw new RuntimeException("User ID is required");
+        }
+
+        log.info("User {} checking out", userId);
+        EntryExitResponse response = entryExitService.checkOut(userId);
+        return ResponseEntity.ok(response);
     }
-    
+
+    @GetMapping("/current")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN')")
+    public ResponseEntity<List<EntryExitResponse>> getCurrentEntries() {
+        return ResponseEntity.ok(entryExitService.getCurrentEntries());
+    }
+
     @GetMapping("/user/{userId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN')")
-    public ResponseEntity<List<EntryRecordDTO>> getUserHistory(@PathVariable String userId) {
-        log.info("Admin/Librarian viewing entry history for user: {}", userId);
+    public ResponseEntity<List<EntryExitResponse>> getUserHistory(@PathVariable String userId) {
         return ResponseEntity.ok(entryExitService.getUserHistory(userId));
     }
-    
-    @GetMapping("/stats/daily")
+
+    @GetMapping("/user/{userId}/today")
     @PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN')")
-    public ResponseEntity<Map<String, Object>> getDailyStats() {
-        return ResponseEntity.ok(entryExitService.getDailyStats());
+    public ResponseEntity<Boolean> isUserCheckedInToday(@PathVariable String userId) {
+        return ResponseEntity.ok(entryExitService.isUserCheckedInToday(userId));
     }
-    
-    @GetMapping("/count")
+
+    @GetMapping("/history")
     @PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN')")
-    public ResponseEntity<Map<String, Long>> getCurrentCount() {
-        Map<String, Long> response = new HashMap<>();
-        response.put("count", entryExitService.getCurrentCount());
-        return ResponseEntity.ok(response);
+    public ResponseEntity<List<EntryExitResponse>> getHistory(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
+
+        LocalDateTime start = startDate != null ? LocalDateTime.parse(startDate + "T00:00:00") : LocalDateTime.now().minusDays(7);
+        LocalDateTime end = endDate != null ? LocalDateTime.parse(endDate + "T23:59:59") : LocalDateTime.now();
+
+        List<EntryExitResponse> history = entryExitService.getHistory(start, end);
+        return ResponseEntity.ok(history);
     }
-    
-    @GetMapping("/hours/{branch}")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Map<String, Object>> getOpeningHours(@PathVariable String branch) {
+
+    @GetMapping("/user/{userId}/status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN')")
+    public ResponseEntity<Map<String, Object>> getUserStatus(@PathVariable String userId) {
+        Optional<EntryExitRecord> latest = entryExitService.getLatestEntry(userId);
+        if (latest.isEmpty()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "OUTSIDE");
+            response.put("checkedIn", false);
+            response.put("branch", null);
+            response.put("entryTime", null);
+            return ResponseEntity.ok(response);
+        }
+        EntryExitRecord record = latest.get();
         Map<String, Object> response = new HashMap<>();
-        response.put("branch", branch);
-        response.put("openingHours", libraryHoursService.getOpeningHours(branch));
-        response.put("isOpenNow", libraryHoursService.isLibraryOpen(branch, LocalDateTime.now()));
+        response.put("status", record.getStatus());
+        response.put("checkedIn", "INSIDE".equals(record.getStatus()));
+        response.put("branch", record.getBranch());
+        response.put("entryTime", record.getEntryTime());
         return ResponseEntity.ok(response);
     }
-    
+
     @GetMapping("/health")
     public ResponseEntity<String> health() {
-        return ResponseEntity.ok("Entry-Exit Service is healthy!");
+        return ResponseEntity.ok("Entry-Exit Service is healthy! 🚪");
     }
 }

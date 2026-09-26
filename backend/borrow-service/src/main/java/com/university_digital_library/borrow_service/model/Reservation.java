@@ -5,9 +5,9 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
-// Thêm @Builder.Default cho các field có giá trị mặc định
 @Entity
 @Table(name = "reservations")
 @Data
@@ -27,8 +27,7 @@ public class Reservation {
     private Long bookId;
     
     @Column(nullable = false)
-    @Builder.Default
-    private LocalDateTime reservationDate = LocalDateTime.now();
+    private LocalDateTime reservationDate;
     
     @Column(nullable = false)
     private LocalDateTime pickupDate;
@@ -42,11 +41,28 @@ public class Reservation {
     
     private String notes;
     
+    private String bookTitle;
+    private String bookAuthor;
+    private String bookLocation;
+    
     private LocalDateTime confirmedAt;
     private String confirmedBy;
     
     private LocalDateTime cancelledAt;
     private String cancelReason;
+    
+    @PrePersist
+    protected void onCreate() {
+        if (reservationDate == null) {
+            reservationDate = LocalDateTime.now();
+        }
+        if (status == null) {
+            status = ReservationStatus.CONFIRMED;
+        }
+        if (expiryDate == null) {
+            expiryDate = LocalDateTime.now().plusDays(1);
+        }
+    }
     
     public enum ReservationStatus {
         PENDING, CONFIRMED, CANCELLED, EXPIRED, COMPLETED

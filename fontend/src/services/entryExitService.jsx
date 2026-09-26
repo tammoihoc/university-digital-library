@@ -1,44 +1,31 @@
-// src/services/entryExitService.js
 const API_BASE = 'http://localhost:8080/api/entry-exit';
 
 const entryExitService = {
-  /**
-   * Ghi nhận vào thư viện
-   * @param {string} userId - Mã sinh viên/người dùng
-   * @param {string} branch - 'B' (Cơ sở B) hoặc 'E' (Cơ sở E)
-   */
-  recordEntry: async (userId, branch = 'B') => {
-    try {
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        throw new Error('Vui lòng đăng nhập lại');
-      }
-      
-      const response = await fetch(`${API_BASE}/entry`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'X-Branch': branch
-        },
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Ghi nhận thất bại');
-      }
-      
-      const data = await response.json();
-      console.log('✅ Entry recorded:', data);
-      return data;
-      
-    } catch (error) {
-      console.error('Error recording entry:', error.message);
-      throw error;
+recordEntry: async (userId, branch = 'B') => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('Vui lòng đăng nhập lại');
+
+    const response = await fetch(`${API_BASE}/check-in`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include',
+      body: JSON.stringify({ userId, branch }) // userId = studentId hoặc username
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'Ghi nhận thất bại');
     }
-  },
+    return await response.json();
+  } catch (error) {
+    console.error('Error recording entry:', error.message);
+    throw error;
+  }
+},
 
   /**
    * Lấy danh sách người đang trong thư viện (chỉ ADMIN/LIBRARIAN)
@@ -128,12 +115,11 @@ const entryExitService = {
   getMyHistory: async () => {
     try {
       const token = localStorage.getItem('token');
-      
-      if (!token) {
-        return [];
-      }
-      
-      const response = await fetch(`${API_BASE}/my-history`, {
+      if (!token) return [];
+
+      // Lấy lịch sử trong ngày hôm nay
+      const today = new Date().toISOString().split('T')[0];
+      const response = await fetch(`${API_BASE}/history?startDate=${today}&endDate=${today}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -141,14 +127,12 @@ const entryExitService = {
         },
         credentials: 'include'
       });
-      
+
       if (!response.ok) {
         if (response.status === 403) return [];
         throw new Error(`HTTP ${response.status}`);
       }
-      
       return await response.json();
-      
     } catch (error) {
       console.error('Error fetching my history:', error.message);
       return [];

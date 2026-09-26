@@ -1,13 +1,15 @@
-// user-service/src/main/java/.../controller/UserProfileController.java
 package com.university_digital_library.user_service.controller;
 
 import com.university_digital_library.user_service.dto.CreateUserProfileRequest;
+import com.university_digital_library.user_service.dto.UpdateBorrowLimitRequest;
 import com.university_digital_library.user_service.dto.UpdateUserProfileRequest;
 import com.university_digital_library.user_service.dto.UserProfileDTO;
 import com.university_digital_library.user_service.model.UserProfile;
 import com.university_digital_library.user_service.service.UserProfileService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -23,252 +25,262 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Slf4j
 public class UserProfileController {
-    
+
     private final UserProfileService userProfileService;
-    
-    // ========== PUBLIC API (Không cần token) ==========
-    
+
+    // ========== ADMIN-ONLY / INTERNAL ==========
+    // ĐÃ ĐỔI: trước đây permitAll() công khai hoàn toàn, ai cũng POST được tạo
+    // profile bừa bãi. Giờ chỉ ADMIN (thao tác trực tiếp) hoặc INTERNAL (auth-service
+    // gọi Feign kèm X-Internal-Key khi admin đăng ký tài khoản qua /auth/register)
+    // mới gọi được — khớp với thay đổi /auth/register giờ cũng chỉ ADMIN gọi được.
     @PostMapping("/profile")
-    public ResponseEntity<?> createUserProfile(@RequestBody CreateUserProfileRequest request) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'INTERNAL')")
+    public ResponseEntity<?> createUserProfile(@Valid @RequestBody CreateUserProfileRequest request) {
         try {
             UserProfileDTO profile = userProfileService.createUserProfile(request);
-            return ResponseEntity.ok(profile);
+            return ResponseEntity.status(HttpStatus.CREATED).body(profile);
         } catch (Exception ex) {
+            log.error("Create profile error: {}", ex.getMessage());
             return ResponseEntity.badRequest().body(ex.getMessage());
         }
     }
-    
-    // ========== API CẦN TOKEN ==========
-    
-// user-service/src/main/java/.../controller/UserProfileController.java
-// Sửa API getUserProfile
 
-// user-service/src/main/java/.../controller/UserProfileController.java
-@GetMapping("/profile/{username}")
-public ResponseEntity<?> getUserProfile(@PathVariable String username, Authentication auth) {
-    try {
-        if (auth == null) {
-            return ResponseEntity.status(401).body("Unauthorized");
-        }
-        
-        String currentUser = auth.getName();
-        boolean isAdminOrLibrarian = auth.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || 
-                              a.getAuthority().equals("ROLE_LIBRARIAN"));
-        
-        // ✅ CHO PHÉP ADMIN/LIBRARIAN XEM TẤT CẢ
-        if (isAdminOrLibrarian) {
-            try {
-                UserProfileDTO profile = userProfileService.getUserProfile(username);
-                return ResponseEntity.ok(profile);
-            } catch (Exception e) {
-                // Nếu không tìm thấy profile, trả về thông tin cơ bản
-                Map<String, Object> basicInfo = new HashMap<>();
-                basicInfo.put("username", username);
-                basicInfo.put("fullName", username);
-                basicInfo.put("userType", "STUDENT");
-                basicInfo.put("studentId", "N/A");
-                basicInfo.put("faculty", "N/A");
-                basicInfo.put("major", "N/A");
-                return ResponseEntity.ok(basicInfo);
+    // ========== PUBLIC ENDPOINTS ==========
+
+    @GetMapping("/student/{studentId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getUserByStudentId(@PathVariable String studentId) {
+        try {
+            UserProfile profile = userProfileService.getUserByStudentId(studentId);
+            if (profile == null) {
+                return ResponseEntity.notFound().build();
             }
+            return ResponseEntity.ok(UserProfileDTO.fromEntity(profile));
+        } catch (Exception ex) {
+            log.error("Get user by studentId error: {}", ex.getMessage());
+            return ResponseEntity.notFound().build();
         }
-        
-        // STUDENT: chỉ xem được chính mình
-        if (!currentUser.equals(username)) {
-            return ResponseEntity.status(403).body("You can only view your own profile");
-        }
-        
-        UserProfileDTO profile = userProfileService.getUserProfile(username);
-        return ResponseEntity.ok(profile);
-        
-    } catch (Exception ex) {
-        Map<String, Object> basicInfo = new HashMap<>();
-        basicInfo.put("username", username);
-        basicInfo.put("fullName", username);
-        basicInfo.put("userType", "STUDENT");
-        basicInfo.put("studentId", "N/A");
-        basicInfo.put("faculty", "N/A");
-        basicInfo.put("major", "N/A");
-        return ResponseEntity.ok(basicInfo);
     }
-}
-    
+
+    // ========== PROTECTED ENDPOINTS ==========
+
+    @GetMapping("/profile/{username}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getUserProfile(@PathVariable String username, Authentication auth) {
+        try {
+            String currentUser = auth.getName();
+            boolean isAdminOrLibrarian = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") ||
+                              a.getAuthority().equals("ROLE_LIBRARIAN"));
+
+            if (!isAdminOrLibrarian && !currentUser.equals(username)) {
+                return ResponseEntity.status(403).body("You can only view your own profile");
+            }
+
+            UserProfileDTO profile = userProfileService.getUserProfile(username);
+            return ResponseEntity.ok(profile);
+
+        } catch (Exception ex) {
+            log.error("Get profile error: {}", ex.getMessage());
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/profile")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getMyProfile(Authentication auth) {
+        String username = auth.getName();
+        return getUserProfile(username, auth);
+    }
+
     @PutMapping("/profile/{username}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> updateUserProfile(
             @PathVariable String username,
-            @RequestBody UpdateUserProfileRequest request,
+            @Valid @RequestBody UpdateUserProfileRequest request,
             Authentication auth) {
+
         try {
-            // Kiểm tra quyền: chỉ admin/librarian hoặc chính user mới được sửa
             String currentUser = auth.getName();
             boolean isAdminOrLibrarian = auth.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || 
-                                  a.getAuthority().equals("ROLE_LIBRARIAN"));
-            
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") ||
+                              a.getAuthority().equals("ROLE_LIBRARIAN"));
+
             if (!isAdminOrLibrarian && !currentUser.equals(username)) {
                 return ResponseEntity.status(403).body("You can only update your own profile");
             }
-            
-            UserProfileDTO updatedProfile = userProfileService.updateUserProfile(username, request);
-            return ResponseEntity.ok(updatedProfile);
+
+            UserProfileDTO profile = userProfileService.updateUserProfile(username, request);
+            return ResponseEntity.ok(profile);
+
         } catch (Exception ex) {
+            log.error("Update profile error: {}", ex.getMessage());
             return ResponseEntity.badRequest().body(ex.getMessage());
         }
     }
-    
-    @GetMapping
+
+    // ========== ADMIN/LIBRARIAN ENDPOINTS ==========
+
+    @GetMapping("/all")
     @PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN')")
     public ResponseEntity<List<UserProfileDTO>> getAllUsers() {
-        List<UserProfileDTO> users = userProfileService.getAllUsers();
-        return ResponseEntity.ok(users);
+        return ResponseEntity.ok(userProfileService.getAllUsers());
     }
-    
+
     @GetMapping("/students")
     @PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN')")
     public ResponseEntity<List<UserProfileDTO>> getAllStudents() {
-        List<UserProfileDTO> students = userProfileService.getStudents();
-        return ResponseEntity.ok(students);
+        return ResponseEntity.ok(userProfileService.getStudents());
     }
-    
-    @GetMapping("/search")
-    @PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN')")
-    public ResponseEntity<List<UserProfileDTO>> searchStudents(@RequestParam String q) {
-        List<UserProfileDTO> students = userProfileService.searchStudents(q);
-        return ResponseEntity.ok(students);
-    }
-    
+
     @GetMapping("/type/{userType}")
     @PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN')")
-    public ResponseEntity<List<UserProfileDTO>> getUsersByType(@PathVariable UserProfile.UserType userType) {
-        List<UserProfileDTO> users = userProfileService.getUsersByType(userType);
-        return ResponseEntity.ok(users);
+    public ResponseEntity<List<UserProfileDTO>> getUsersByType(
+            @PathVariable UserProfile.UserType userType) {
+        return ResponseEntity.ok(userProfileService.getUsersByType(userType));
     }
-    
-    // ========== API CHO BORROW SERVICE (Chỉ ADMIN/LIBRARIAN) ==========
-    
+
+    @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN')")
+    public ResponseEntity<List<UserProfileDTO>> searchUsers(@RequestParam String q) {
+        return ResponseEntity.ok(userProfileService.searchUsers(q));
+    }
+
+    // ========== BORROW INFO FOR BORROW SERVICE ==========
 @GetMapping("/{userId}/borrow-info")
-@PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN')")
 public ResponseEntity<Map<String, Object>> getUserBorrowInfo(
         @PathVariable String userId,
         Authentication auth) {
-    
-    // ✅ LOG ĐỂ DEBUG
-    log.info("User: {}, Roles: {}", auth.getName(), auth.getAuthorities());
-    
-    UserProfile profile = userProfileService.getUserProfileEntity(userId);
-    
+    // Cho phép user tự xem thông tin của mình, ADMIN/LIBRARIAN xem bất kỳ,
+    // hoặc service nội bộ (ROLE_INTERNAL, gán bởi InternalServiceAuthFilter khi
+    // có header X-Internal-Key hợp lệ — dùng khi borrow-service cần tra cứu
+    // hạn mức mượn của user mà không có sẵn JWT của người dùng để forward).
+    String currentUser = auth.getName();
+    boolean isPrivileged = auth.getAuthorities().stream()
+        .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") ||
+                       a.getAuthority().equals("ROLE_LIBRARIAN") ||
+                       a.getAuthority().equals("ROLE_INTERNAL"));
+    if (!isPrivileged && !currentUser.equals(userId)) {
+        throw new RuntimeException("You can only view your own borrow info");
+    }
+    UserProfileDTO profile = userProfileService.getUserProfile(userId);
     Map<String, Object> response = new HashMap<>();
     response.put("userId", profile.getUsername());
-    response.put("maxBorrowLimit", 5);
-    response.put("currentBorrowed", profile.getCurrentBorrowed() != null ? profile.getCurrentBorrowed() : 0);
-    response.put("canBorrowMore", profile.getCurrentBorrowed() == null || profile.getCurrentBorrowed() < 5);
-    
+    response.put("maxBorrowLimit", profile.getMaxBorrowLimit());
+    response.put("currentBorrowed", profile.getCurrentBorrowed());
+    response.put("canBorrowMore", profile.getCurrentBorrowed() < profile.getMaxBorrowLimit());
+    response.put("isLocked", profile.getIsLocked());
+    response.put("lockedUntil", profile.getLockedUntil());
+    response.put("fullName", profile.getFullName());
+    response.put("userType", profile.getUserType());
     return ResponseEntity.ok(response);
 }
-    
-    // ========== API CHO SINH VIÊN/GIẢNG VIÊN (Xem thông tin của chính mình) ==========
-    
-    @GetMapping("/my/borrow-info")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Map<String, Object>> getMyBorrowInfo(Authentication auth) {
-        String userId = auth.getName();
-        UserProfile profile = userProfileService.getUserProfileEntity(userId);
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("userId", profile.getUsername());
-        response.put("maxBorrowLimit", 5);
-        response.put("currentBorrowed", profile.getCurrentBorrowed() != null ? profile.getCurrentBorrowed() : 0);
-        response.put("canBorrowMore", profile.getCurrentBorrowed() == null || profile.getCurrentBorrowed() < 5);
-        
-        log.info("User {} checked their borrow info", userId);
-        return ResponseEntity.ok(response);
-    }
-    
+
     @PostMapping("/{userId}/borrow-count")
-    @PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN')")
+    // Khôi phục @PreAuthorize — cùng với SecurityConfig.hasAnyRole("ADMIN","LIBRARIAN","INTERNAL")
+    // ở tầng filter chain, đây là lớp bảo vệ thứ 2 (defense in depth) chống lại lỗ hổng
+    // cho phép sửa borrow-count của bất kỳ ai mà không cần xác thực.
+    @PreAuthorize("hasAnyRole('ADMIN', 'LIBRARIAN', 'INTERNAL')")
     public ResponseEntity<?> updateBorrowCount(
             @PathVariable String userId,
             @RequestParam Integer newCount) {
-        UserProfile profile = userProfileService.getUserProfileEntity(userId);
-        
-        profile.setCurrentBorrowed(newCount);
-        userProfileService.saveUserProfile(profile);
-        
-        log.info("Updated borrow count for user {} to {}", userId, newCount);
-        return ResponseEntity.ok("Borrow count updated");
+        log.info("📝 Updating borrow count for user {} to {}", userId, newCount);
+        UserProfileDTO profile = userProfileService.updateBorrowCount(userId, newCount);
+        return ResponseEntity.ok(profile);
     }
-    
-    // =========== AVATAR APIs ===========
-    
-    @PostMapping("/{username}/avatar/upload")
+
+    // ========== BORROW LIMIT MANAGEMENT (ADMIN ONLY) ==========
+
+    @PutMapping("/{userId}/borrow-limit")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateBorrowLimit(
+            @PathVariable String userId,
+            @Valid @RequestBody UpdateBorrowLimitRequest request) {
+
+        UserProfileDTO profile = userProfileService.updateBorrowLimit(userId, request);
+        return ResponseEntity.ok(profile);
+    }
+
+    @PostMapping("/{userId}/lock")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> lockUser(
+            @PathVariable String userId,
+            @RequestParam(required = false) Integer days,
+            @RequestParam(required = false) String reason) {
+
+        UserProfileDTO profile = userProfileService.lockUser(userId, days, reason);
+        return ResponseEntity.ok(profile);
+    }
+
+    @PostMapping("/{userId}/unlock")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> unlockUser(@PathVariable String userId) {
+        UserProfileDTO profile = userProfileService.unlockUser(userId);
+        return ResponseEntity.ok(profile);
+    }
+
+    // ========== AVATAR ==========
+
+    @PostMapping("/{username}/avatar")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> uploadAvatar(
             @PathVariable String username,
             @RequestParam("file") MultipartFile file,
             Authentication auth) {
+
         try {
-            // Kiểm tra quyền: chỉ admin/librarian hoặc chính user mới được upload avatar
             String currentUser = auth.getName();
             boolean isAdminOrLibrarian = auth.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || 
-                                  a.getAuthority().equals("ROLE_LIBRARIAN"));
-            
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") ||
+                              a.getAuthority().equals("ROLE_LIBRARIAN"));
+
             if (!isAdminOrLibrarian && !currentUser.equals(username)) {
                 return ResponseEntity.status(403).body("You can only upload avatar for yourself");
             }
-            
+
             String avatarUrl = userProfileService.uploadAvatar(username, file);
             Map<String, String> response = new HashMap<>();
             response.put("message", "Avatar uploaded successfully");
             response.put("avatarUrl", avatarUrl);
             return ResponseEntity.ok(response);
+
         } catch (Exception ex) {
+            log.error("Upload avatar error: {}", ex.getMessage());
             return ResponseEntity.badRequest().body(ex.getMessage());
         }
     }
-    
+
     @GetMapping("/{username}/avatar")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<byte[]> getAvatar(@PathVariable String username, Authentication auth) {
-        // Kiểm tra quyền: chỉ admin/librarian hoặc chính user mới được xem avatar
-        String currentUser = auth.getName();
-        boolean isAdminOrLibrarian = auth.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || 
-                              a.getAuthority().equals("ROLE_LIBRARIAN"));
-        
-        if (!isAdminOrLibrarian && !currentUser.equals(username)) {
-            return ResponseEntity.status(403).body(null);
-        }
-        return userProfileService.getUserAvatar(username);
-    }
-    
-    @DeleteMapping("/{username}/avatar")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> deleteAvatar(
+    public ResponseEntity<byte[]> getAvatar(
             @PathVariable String username,
             Authentication auth) {
+
         try {
-            // Kiểm tra quyền: chỉ admin/librarian hoặc chính user mới được xóa avatar
             String currentUser = auth.getName();
             boolean isAdminOrLibrarian = auth.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || 
-                                  a.getAuthority().equals("ROLE_LIBRARIAN"));
-            
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") ||
+                              a.getAuthority().equals("ROLE_LIBRARIAN"));
+
             if (!isAdminOrLibrarian && !currentUser.equals(username)) {
-                return ResponseEntity.status(403).body("You can only delete your own avatar");
+                return ResponseEntity.status(403).build();
             }
-            
-            UserProfile user = userProfileService.getUserProfileEntity(username);
-            user.setAvatarUrl(null);
-            userProfileService.saveUserProfile(user);
-            
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Avatar deleted successfully");
-            return ResponseEntity.ok(response);
+
+            byte[] avatarBytes = userProfileService.getAvatarBytes(username);
+            if (avatarBytes == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            String contentType = "image/jpeg";
+
+            return ResponseEntity.ok()
+                    .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+                    .header("Cache-Control", "public, max-age=3600")
+                    .body(avatarBytes);
+
         } catch (Exception ex) {
-            return ResponseEntity.badRequest().body(ex.getMessage());
+            log.error("Get avatar error: {}", ex.getMessage());
+            return ResponseEntity.status(500).build();
         }
     }
 }

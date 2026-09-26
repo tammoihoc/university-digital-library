@@ -1,4 +1,4 @@
-// borrow-service/src/main/java/.../config/SecurityConfig.java
+// borrow-service/src/main/java/com/university_digital_library/borrow_service/config/SecurityConfig.java
 package com.university_digital_library.borrow_service.config;
 
 import com.university_digital_library.borrow_service.security.JwtAuthFilter;
@@ -29,14 +29,11 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/health", "/actuator/health", "/test").permitAll()
-                // Chỉ ADMIN và LIBRARIAN mới được xem danh sách đặt lịch
+                .requestMatchers("/health", "/borrows/health", "/actuator/health", "/test").permitAll()
                 .requestMatchers("/reservations/active/all", "/reservations/all", "/reservations/book/**")
                     .hasAnyRole("ADMIN", "LIBRARIAN")
-                // Sinh viên chỉ được xem đặt lịch của mình
                 .requestMatchers("/reservations/my").authenticated()
                 .requestMatchers("/reservations").authenticated()
-                // Mượn trực tiếp chỉ dành cho ADMIN và LIBRARIAN
                 .requestMatchers("/borrows/direct").hasAnyRole("ADMIN", "LIBRARIAN")
                 .anyRequest().authenticated()
             )

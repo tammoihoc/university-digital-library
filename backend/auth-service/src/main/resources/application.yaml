@@ -6,9 +6,9 @@ spring:
     name: auth-service
   
   datasource:
-    url: jdbc:mysql://127.0.0.1:3306/university_digital_library?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-    username: root
-    password: root
+    url: jdbc:mysql://127.0.0.1:3306/auth_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: auth_user
+    password: auth_pass
     driver-class-name: com.mysql.cj.jdbc.Driver
   
   jpa:
@@ -28,27 +28,22 @@ spring:
         enabled: true
         register: true
         instance-id: ${spring.application.name}:${server.port}
-        # THÊM CÁC DÒNG NÀY ĐỂ FIX LỖI HOSTNAME
-        hostname: localhost                    # Dùng localhost thay vì archlinux
-        ip-address: 127.0.0.1                  # Dùng IP trực tiếp
-        prefer-ip-address: true                # Ưu tiên dùng IP
-        # Cấu hình health check đúng cách
+        hostname: localhost
+        ip-address: 127.0.0.1
+        prefer-ip-address: true
         health-check-path: /actuator/health
         health-check-interval: 30s
         health-check-timeout: 10s
-        # Dùng localhost trong health check URL
-        health-check-url: http://localhost:${server.port}/actuator/health
-        # Metadata (optional)
-        metadata:
-          secure: "false"
-          version: "1.0"
 
-# JWT Configuration
-# auth-service/src/main/resources/application.yml
 security:
   jwt:
     secret: "mySuperSecretKeyForJWTGenerationThatIsAtLeast32CharactersLong"
     expiration-ms: 3600000
+  internal:
+    # Dùng để auth-service gọi user-service tạo profile khi ADMIN đăng ký tài
+    # khoản mới (POST /users/profile giờ không còn permitAll). Giá trị PHẢI
+    # giống hệt user-service.
+    api-key: "internal-service-shared-secret-key-CHANGE-ME-in-production"
 
 management:
   endpoints:
@@ -56,18 +51,8 @@ management:
       exposure:
         include: health,info,metrics
       base-path: /actuator
-  endpoint:
-    health:
-      show-details: always
-      probes:
-        enabled: true
-    info:
-      enabled: true
-    metrics:
-      enabled: true
 
 logging:
   level:
-    com.university_digital_library.auth_service: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.springframework.cloud.consul: DEBUG
+    com.university_digital_library: DEBUG
+    org.springframework.security: DEBUG

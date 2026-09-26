@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -34,16 +35,26 @@ public class BorrowRecord {
     private LocalDateTime returnedAt;
     
     @Enumerated(EnumType.STRING)
-    private BorrowStatus status;
+    @Builder.Default
+    private BorrowStatus status = BorrowStatus.ACTIVE;
     
     private Double fineAmount;
     
     private String notes;
     
+    private String borrowedLocation;
+    
+    @Column(unique = true)
+    private String reservationId;
+    
     @PrePersist
     protected void onCreate() {
-        borrowedAt = LocalDateTime.now();
-        dueDate = LocalDateTime.now().plusDays(14);
+        if (borrowedAt == null) {
+            borrowedAt = LocalDateTime.now();
+        }
+        if (dueDate == null) {
+            dueDate = LocalDateTime.now().plusDays(14);
+        }
         if (status == null) {
             status = BorrowStatus.ACTIVE;
         }
@@ -53,37 +64,6 @@ public class BorrowRecord {
     }
     
     public enum BorrowStatus {
-        ACTIVE,      // Đang mượn
-        OVERDUE,     // Quá hạn
-        RETURNED,    // Đã trả
-        CANCELLED    // Đã hủy
+        ACTIVE, OVERDUE, RETURNED, CANCELLED
     }
-    
-    // Getter và Setter thủ công (đảm bảo Lombok hoạt động)
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    
-    public String getUserId() { return userId; }
-    public void setUserId(String userId) { this.userId = userId; }
-    
-    public Long getBookId() { return bookId; }
-    public void setBookId(Long bookId) { this.bookId = bookId; }
-    
-    public LocalDateTime getBorrowedAt() { return borrowedAt; }
-    public void setBorrowedAt(LocalDateTime borrowedAt) { this.borrowedAt = borrowedAt; }
-    
-    public LocalDateTime getDueDate() { return dueDate; }
-    public void setDueDate(LocalDateTime dueDate) { this.dueDate = dueDate; }
-    
-    public LocalDateTime getReturnedAt() { return returnedAt; }
-    public void setReturnedAt(LocalDateTime returnedAt) { this.returnedAt = returnedAt; }
-    
-    public BorrowStatus getStatus() { return status; }
-    public void setStatus(BorrowStatus status) { this.status = status; }
-    
-    public Double getFineAmount() { return fineAmount; }
-    public void setFineAmount(Double fineAmount) { this.fineAmount = fineAmount; }
-    
-    public String getNotes() { return notes; }
-    public void setNotes(String notes) { this.notes = notes; }
 }

@@ -1,18 +1,15 @@
 server:
   port: 8085
+
 spring:
   application:
     name: entry-exit-service
   
   datasource:
-    url: jdbc:mysql://127.0.0.1:3306/university_digital_library?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8
-    username: root
-    password: root
+    url: jdbc:mysql://127.0.0.1:3306/entry_exit_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: entry_exit_user
+    password: entry_exit_pass
     driver-class-name: com.mysql.cj.jdbc.Driver
-    hikari:
-      maximum-pool-size: 10
-      minimum-idle: 5
-      connection-timeout: 30000
   
   jpa:
     hibernate:
@@ -22,9 +19,6 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
-        jdbc:
-          batch_size: 20
-    open-in-view: false
   
   cloud:
     consul:
@@ -40,39 +34,17 @@ spring:
         health-check-path: /actuator/health
         health-check-interval: 30s
         health-check-timeout: 10s
-        health-check-url: http://localhost:${server.port}/actuator/health
-        tags:
-          - "microservice"
-          - "entry-exit"
-        metadata:
-          version: "1.0"
-          environment: "development"
+
 security:
   jwt:
     secret: "mySuperSecretKeyForJWTGenerationThatIsAtLeast32CharactersLong"
+
 management:
   endpoints:
     web:
       exposure:
         include: health,info,metrics
-      base-path: /actuator
-  endpoint:
-    health:
-      show-details: always
-      probes:
-        enabled: true
-    metrics:
-      enabled: true
-feign:
-  client:
-    config:
-      default:
-        connectTimeout: 5000
-        readTimeout: 5000
-        loggerLevel: basic
-  circuitbreaker:
-    enabled: true
+
 logging:
   level:
-    com.university_digital_library.entry_exit_service: DEBUG
-    org.springframework.cloud.consul: INFO
+    com.university: DEBUG

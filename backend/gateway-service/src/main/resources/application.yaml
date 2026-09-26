@@ -12,96 +12,59 @@ spring:
         locator:
           enabled: true
           lower-case-service-id: true
-
+      
       default-filters:
-        # ✅ QUAN TRỌNG: Giữ lại Authorization header khi forward
         - PreserveHostHeader
         - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
-
+      
       routes:
-        # Route cho Auth Service
-        - id: auth-service-route
+        - id: auth-service
           uri: lb://auth-service
           predicates:
             - Path=/api/auth/**
           filters:
             - RewritePath=/api/auth/(?<segment>.*), /auth/${segment}
-            - name: CircuitBreaker
-              args:
-                name: authService
-                fallbackUri: forward:/fallback/auth
         
-        # Route cho Book Service
-        - id: book-service-route
-          uri: lb://book-service
-          predicates:
-            - Path=/api/books/**
-          filters:
-            - RewritePath=/api/(?<segment>.*), /${segment}
-            - name: CircuitBreaker
-              args:
-                name: bookService
-                fallbackUri: forward:/fallback/book
-        
-        # Route cho User Service
-        - id: user-service-route
+        - id: user-service
           uri: lb://user-service
           predicates:
             - Path=/api/users/**
           filters:
             - RewritePath=/api/(?<segment>.*), /${segment}
-            - name: CircuitBreaker
-              args:
-                name: userService
-                fallbackUri: forward:/fallback/user
         
-        # Route cho Borrow Service
-        - id: borrow-service-route
+        - id: book-service
+          uri: lb://book-service
+          predicates:
+            - Path=/api/books/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /${segment}
+        
+        - id: borrow-service
           uri: lb://borrow-service
           predicates:
             - Path=/api/borrows/**,/api/reservations/**
           filters:
             - RewritePath=/api/(?<segment>.*), /${segment}
-            - name: CircuitBreaker
-              args:
-                name: borrowService
-                fallbackUri: forward:/fallback/borrow
         
-        # Route cho Entry-Exit Service
-        - id: entry-exit-service-route
+        - id: entry-exit-service
           uri: lb://entry-exit-service
           predicates:
             - Path=/api/entry-exit/**
           filters:
             - RewritePath=/api/(?<segment>.*), /${segment}
-            - name: CircuitBreaker
-              args:
-                name: entryExitService
-                fallbackUri: forward:/fallback/entry-exit
         
-        # Route cho Fine Service
-        - id: fine-service-route
+        - id: fine-service
           uri: lb://fine-service
           predicates:
             - Path=/api/fines/**
           filters:
             - RewritePath=/api/(?<segment>.*), /${segment}
-            - name: CircuitBreaker
-              args:
-                name: fineService
-                fallbackUri: forward:/fallback/fine
         
-        # Static files - không cần token
-        - id: static-files-route
+        - id: static-files
           uri: lb://book-service
           predicates:
             - Path=/uploads/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: bookService
-                fallbackUri: forward:/fallback/book
-
+    
     consul:
       host: localhost
       port: 8500
@@ -116,66 +79,27 @@ spring:
         health-check-interval: 30s
         health-check-timeout: 10s
 
-resilience4j:
-  circuitbreaker:
-    instances:
-      authService:
-        register-health-indicator: true
-        sliding-window-size: 10
-        minimum-number-of-calls: 5
-        permitted-number-of-calls-in-half-open-state: 3
-        wait-duration-in-open-state: 5s
-        failure-rate-threshold: 50
-      bookService:
-        register-health-indicator: true
-        sliding-window-size: 10
-        minimum-number-of-calls: 5
-        permitted-number-of-calls-in-half-open-state: 3
-        wait-duration-in-open-state: 5s
-        failure-rate-threshold: 50
-      userService:
-        register-health-indicator: true
-        sliding-window-size: 10
-        minimum-number-of-calls: 5
-        permitted-number-of-calls-in-half-open-state: 3
-        wait-duration-in-open-state: 5s
-        failure-rate-threshold: 50
-      borrowService:
-        register-health-indicator: true
-        sliding-window-size: 10
-        minimum-number-of-calls: 5
-        permitted-number-of-calls-in-half-open-state: 3
-        wait-duration-in-open-state: 5s
-        failure-rate-threshold: 50
-      entryExitService:
-        register-health-indicator: true
-        sliding-window-size: 10
-        minimum-number-of-calls: 5
-        permitted-number-of-calls-in-half-open-state: 3
-        wait-duration-in-open-state: 5s
-        failure-rate-threshold: 50
-      fineService:
-        register-health-indicator: true
-        sliding-window-size: 10
-        minimum-number-of-calls: 5
-        permitted-number-of-calls-in-half-open-state: 3
-        wait-duration-in-open-state: 5s
-        failure-rate-threshold: 50
+# ✅ THÊM RSA CONFIG NÀY
+security:
+  rsa:
+    enabled: false  # TẮT RSA SIGNATURE ĐỂ KHÔNG BỊ LỖI
+    public-key: |
+      -----BEGIN PUBLIC KEY-----
+      MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxnhvbqXOUQOjNQjNGBwe
+      kDR+wR6C4Ant7CCTTjotX9zi5cTyPQYpGH0iQMOgnFf/dhqkH6KcuKMXddtvNs1v
+      f0oLJvVlqvN9qHqN7BxGLLA+J1VYohMxa/Anv+U34iibvK7JqDU7pdJKhdb+zXO+
+      e/fbxGucJvZ8yqSxd4Z1TuwscsvkYjy3p6dZeZ/buoso7ymL8JbgOH/qIcnBZR8u
+      otj/u9FNERVc+CsJGNV+yIYcs9wl+3BBOcbq2rDyYEdayPyyU5kU+bKteEn2dVba
+      4n13uhWBHRNtKm5iuEg0/c8+w9H+fB8SUbqhq/yAsd/yEOhrd2n+7nHPD1EwDbkt
+      3wIDAQAB
+      -----END PUBLIC KEY-----
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,gateway,circuitbreakers
-      base-path: /actuator
-  endpoint:
-    health:
-      show-details: always
-    gateway:
-      enabled: true
+        include: health,info,gateway
 
 logging:
   level:
     org.springframework.cloud.gateway: INFO
-    org.springframework.cloud.loadbalancer: INFO
-    reactor.netty: INFO

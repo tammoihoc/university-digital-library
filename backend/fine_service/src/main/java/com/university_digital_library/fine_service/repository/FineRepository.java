@@ -1,10 +1,10 @@
-// /home/tam/university-digital-library/backend/fine-service/src/main/java/com/university_digital_library/fine_service/repository/FineRepository.java
 package com.university_digital_library.fine_service.repository;
 
 import com.university_digital_library.fine_service.model.Fine;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -19,6 +19,10 @@ public interface FineRepository extends JpaRepository<Fine, Long> {
     
     List<Fine> findByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
     
+    // Thêm method mới
+    List<Fine> findByUserIdAndIsPaidFalse(String userId);
+    
+List<Fine> findByCreatedAtBeforeAndIsPaidFalse(LocalDateTime date);
     @Query("SELECT COALESCE(SUM(f.amount), 0) FROM Fine f WHERE f.isPaid = false")
     Double sumUnpaidFines();
     

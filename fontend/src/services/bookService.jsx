@@ -63,7 +63,27 @@ const bookService = {
       return this.getFallbackBooksResponse();
     }
   },
+async uploadPdf(bookId, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${GATEWAY_URL}/api/books/${bookId}/upload-pdf`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+    });
+    if (!response.ok) throw new Error('Upload PDF failed');
+    return await response.json();
+},
 
+async getPdfInfo(bookId) {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${GATEWAY_URL}/api/books/${bookId}/pdf-info`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Failed to fetch PDF info');
+    return await response.json();
+},
   async searchBooks(keyword, page = 0, size = 20) {
     try {
       const token = localStorage.getItem('token');
@@ -190,7 +210,21 @@ const bookService = {
       return `${GATEWAY_URL}/api/books/${bookId}/pdf`;
     }
   },
-
+async getBranches() {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${GATEWAY_URL}/api/books/branches`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        if (!response.ok) throw new Error('Failed to fetch branches');
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching branches:', error);
+        return [];
+    }
+},
   processImageUrl(imageUrl) {
     if (!imageUrl) {
       const randomId = Math.floor(Math.random() * 1000);

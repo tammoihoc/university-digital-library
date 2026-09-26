@@ -1,44 +1,48 @@
 // src/services/userService.jsx
+import { generateSignatureHeaders } from '../utils/cryptoUtils.jsx';
+
 const API_BASE_URL = 'http://localhost:8080/api';
 
 class UserService {
   
-  // Lấy avatar - CẦN TOKEN
-// src/services/userService.jsx
-// Thêm method này nếu chưa có
-
-// src/services/userService.jsx
-// Thêm method này (đã có nhưng cần đảm bảo)
-
-async getAvatarUrl(username) {
-  const token = localStorage.getItem('token');
-  if (!token) {
-    console.warn('No token found, cannot get avatar');
-    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
-  }
-  
-  try {
-    const response = await fetch(`${API_BASE_URL}/users/${username}/avatar`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      }
-    });
-    
-    if (response.ok) {
-      const blob = await response.blob();
-      return URL.createObjectURL(blob);
-    } else if (response.status === 404) {
-      return `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
-    } else {
-      throw new Error(`HTTP ${response.status}`);
+  // Lấy avatar - cần token
+// Lấy avatar - cần token
+async getAvatarUrl(user) {
+    // ✅ Xử lý nếu nhận object hoặc string
+    const username = typeof user === 'string' ? user : user?.username;
+    if (!username) {
+        return `https://api.dicebear.com/7.x/avataaars/svg?seed=guest`;
     }
-  } catch (error) {
-    console.error('Error getting avatar:', error);
-    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
-  }
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+        console.warn('No token found, cannot get avatar');
+        return `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/users/${username}/avatar`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            }
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            return URL.createObjectURL(blob);
+        } else if (response.status === 404) {
+            return `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
+        } else {
+            throw new Error(`HTTP ${response.status}`);
+        }
+    } catch (error) {
+        console.error('Error getting avatar:', error);
+        return `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
+    }
 }
-  // Upload avatar - CẦN TOKEN
+
+  // Upload avatar - cần token
   async uploadAvatar(username, file) {
     try {
       const token = localStorage.getItem('token');
@@ -51,7 +55,7 @@ async getAvatarUrl(username) {
       
       console.log(`📤 Uploading avatar for: ${username}`);
       
-      const response = await fetch(`${API_BASE_URL}/users/${username}/avatar/upload`, {
+      const response = await fetch(`${API_BASE_URL}/users/${username}/avatar`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -71,7 +75,6 @@ async getAvatarUrl(username) {
       localStorage.removeItem(`avatar_${username}`);
       localStorage.removeItem(`avatar_${username}_ts`);
       
-      // Trả về URL mới
       return result.avatarUrl;
       
     } catch (error) {
@@ -80,7 +83,7 @@ async getAvatarUrl(username) {
     }
   }
 
-  // Xóa avatar - CẦN TOKEN
+  // Xóa avatar - cần token
   async deleteAvatar(username) {
     try {
       const token = localStorage.getItem('token');
@@ -116,7 +119,7 @@ async getAvatarUrl(username) {
     }
   }
 
-  // Lấy thông tin user profile - CẦN TOKEN
+  // Lấy thông tin user profile - cần token
   async getUserProfile(username) {
     try {
       const token = localStorage.getItem('token');
@@ -151,7 +154,7 @@ async getAvatarUrl(username) {
     }
   }
 
-  // Cập nhật user profile - CẦN TOKEN
+  // Cập nhật user profile - cần token
   async updateUserProfile(username, userData) {
     try {
       const token = localStorage.getItem('token');
@@ -200,8 +203,26 @@ async getAvatarUrl(username) {
       throw error;
     }
   }
-
-  // Lấy thông tin mượn sách - CẦN TOKEN
+async getUserByStudentId(studentId) {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/users/student/${studentId}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching user by studentId:', error);
+    return null;
+  }
+}
+  // Lấy thông tin mượn sách - cần token
   async getBorrowStats(username) {
     try {
       const token = localStorage.getItem('token');
@@ -233,7 +254,7 @@ async getAvatarUrl(username) {
     }
   }
 
-  // Cập nhật số lượng sách đang mượn - CẦN TOKEN
+  // Cập nhật số lượng sách đang mượn - cần token
   async updateBorrowCount(username, newCount) {
     try {
       const token = localStorage.getItem('token');

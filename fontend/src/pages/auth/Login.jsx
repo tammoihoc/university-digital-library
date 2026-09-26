@@ -120,37 +120,29 @@ const Login = () => {
     setLoading(true);
     setError('');
 
-    try {
-      const response = await authService.login({
-        username: formData.username,
-        password: formData.password
-      });
+  try {
+    const response = await authService.login({
+      username: formData.username,
+      password: formData.password
+    });
+    
+    if (response && response.token) {
+      // Lấy role từ user đã lưu
+      const userRole = authService.getUserRole();
+      console.log('👤 User role after login:', userRole);
       
-      if (response && response.token) {
-        // Lấy user từ storage
-        const user = authService.getUser();
-        const userRole = authService.getUserRole();
-        
-        console.log('User role:', userRole);
-        
-        setError('Đăng nhập thành công! Đang chuyển hướng...');
-        
-        setTimeout(() => {
-          if (userRole === 'LIBRARIAN' || userRole === 'ADMIN') {
-            navigate('/librarian');
-          } else {
-            navigate('/dashboard');
-          }
-        }, 1000);
+      if (userRole === 'LIBRARIAN' || userRole === 'ADMIN') {
+        navigate('/librarian');
       } else {
-        throw new Error('Invalid response from server');
+        navigate('/dashboard');
       }
-      
-    } catch (err) {
-      console.error('Login error:', err);
-      setError(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại tên đăng nhập và mật khẩu.');
-      setLoading(false);
+    } else {
+      throw new Error('Invalid response from server');
     }
+  } catch (err) {
+    console.error('Login error:', err);
+    setError(err.message || 'Đăng nhập thất bại');
+  }
   };
 
   const handleImageError = (e) => {

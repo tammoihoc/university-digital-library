@@ -36,94 +36,99 @@ const Profile = () => {
     major: ''
   });
 
+  const loadUserData = async () => {
+    try {
+      setLoading(true);
+      
+      const storedUser = authService.getUser();
+      
+      if (!storedUser) {
+        navigate('/login');
+        return;
+      }
+      
+      const freshData = await userService.getUserProfile(storedUser.username);
+      const statsData = await userService.getBorrowStats(storedUser.username);
+      
+      console.log('📊 Borrow stats from API:', statsData);
+      
+      if (freshData) {
+        const userData = {
+          ...storedUser,
+          ...freshData,
+          avatar: await userService.getAvatarUrl(freshData.username),
+          fullName: userService.getDisplayName(freshData),
+          displayName: userService.getDisplayName(freshData),
+          firstName: freshData.firstName || '',
+          lastName: freshData.lastName || '',
+          email: freshData.email || storedUser.email || '',
+          phone: freshData.phone || '',
+          address: freshData.address || '',
+          dateOfBirth: freshData.dateOfBirth ? userService.formatDateForInput(freshData.dateOfBirth) : '',
+          faculty: freshData.faculty || 'Công nghệ thông tin',
+          major: freshData.major || 'Kỹ thuật phần mềm',
+          studentId: freshData.studentId || storedUser.username,
+          userType: freshData.userType || storedUser.userType || 'STUDENT',
+          academicYear: freshData.academicYear || new Date().getFullYear(),
+          currentBorrowed: statsData?.currentBorrowed || 0,
+          maxBorrowLimit: statsData?.maxBorrowLimit || 5,
+          canBorrowMore: statsData?.canBorrowMore !== false
+        };
+        
+        console.log('📊 User data loaded:', {
+          fullName: userData.fullName,
+          currentBorrowed: userData.currentBorrowed,
+          maxBorrowLimit: userData.maxBorrowLimit,
+          canBorrowMore: userData.canBorrowMore
+        });
+        
+        setUser(userData);
+        setBorrowStats(statsData);
+        
+        setEditForm({
+          fullName: userData.fullName,
+          email: userData.email || '',
+          phone: userData.phone || '',
+          address: userData.address || '',
+          dateOfBirth: userData.dateOfBirth || '',
+          faculty: userData.faculty || '',
+          major: userData.major || ''
+        });
+        
+        authService.saveUser(userData);
+      } else {
+        setUser(storedUser);
+        setBorrowStats({
+          maxBorrowLimit: 5,
+          currentBorrowed: 0,
+          canBorrowMore: true,
+          overdueBooks: 0
+        });
+      }
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+      setErrorMessage('Không thể tải thông tin hồ sơ');
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadUserData();
+
+    // Tự động reload khi quay lại tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadUserData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
-
-// Trong Profile.jsx, thay thế hàm loadUserData bằng:
-
-// src/pages/profile/Profile.jsx
-// Tìm dòng có "borrowHistory" và xóa hoặc comment
-
-const loadUserData = async () => {
-  try {
-    setLoading(true);
-    
-    const storedUser = authService.getUser();
-    
-    if (!storedUser) {
-      navigate('/login');
-      return;
-    }
-    
-    const freshData = await userService.getUserProfile(storedUser.username);
-    const statsData = await userService.getBorrowStats(storedUser.username);
-    
-    // ❌ XÓA DÒNG NÀY - method không tồn tại
-    // const borrowHistory = await userService.getUserBorrowHistory(storedUser.username);
-    
-    if (freshData) {
-      const userData = {
-        ...storedUser,
-        ...freshData,
-        avatar: await userService.getAvatarUrl(freshData.username),
-        fullName: userService.getDisplayName(freshData),
-        displayName: userService.getDisplayName(freshData),
-        firstName: freshData.firstName || '',
-        lastName: freshData.lastName || '',
-        email: freshData.email || storedUser.email || '',
-        phone: freshData.phone || '',
-        address: freshData.address || '',
-        dateOfBirth: freshData.dateOfBirth ? userService.formatDateForInput(freshData.dateOfBirth) : '',
-        faculty: freshData.faculty || 'Công nghệ thông tin',
-        major: freshData.major || 'Kỹ thuật phần mềm',
-        studentId: freshData.studentId || storedUser.username,
-        userType: freshData.userType || storedUser.userType || 'STUDENT',
-        academicYear: freshData.academicYear || new Date().getFullYear(),
-        currentBorrowed: statsData?.currentBorrowed || 0,
-        maxBorrowLimit: statsData?.maxBorrowLimit || 5,
-        canBorrowMore: statsData?.canBorrowMore !== false
-        // borrowHistory: borrowHistory || []  // ❌ XÓA DÒNG NÀY
-      };
-      
-      console.log('📊 User data loaded:', {
-        fullName: userData.fullName,
-        currentBorrowed: userData.currentBorrowed,
-        maxBorrowLimit: userData.maxBorrowLimit,
-        canBorrowMore: userData.canBorrowMore
-      });
-      
-      setUser(userData);
-      setBorrowStats(statsData);
-      
-      setEditForm({
-        fullName: userData.fullName,
-        email: userData.email || '',
-        phone: userData.phone || '',
-        address: userData.address || '',
-        dateOfBirth: userData.dateOfBirth || '',
-        faculty: userData.faculty || '',
-        major: userData.major || ''
-      });
-      
-      authService.saveUser(userData);
-    } else {
-      setUser(storedUser);
-      setBorrowStats({
-        maxBorrowLimit: 5,
-        currentBorrowed: 0,
-        canBorrowMore: true,
-        overdueBooks: 0
-      });
-    }
-    
-    setLoading(false);
-  } catch (error) {
-    console.error('Error loading user profile:', error);
-    setErrorMessage('Không thể tải thông tin hồ sơ');
-    setLoading(false);
-  }
-};
 
   const handleLogout = () => {
     authService.logout();
@@ -178,6 +183,9 @@ const loadUserData = async () => {
       setSuccessMessage('Thông tin đã được cập nhật thành công!');
       setIsEditing(false);
       
+      // Tải lại dữ liệu sau khi lưu
+      await loadUserData();
+      
       setTimeout(() => {
         setSuccessMessage('');
       }, 3000);
@@ -202,77 +210,68 @@ const loadUserData = async () => {
     setIsEditing(false);
   };
 
-  // ========== AVATAR UPLOAD FUNCTIONS ==========
-
+  // Avatar upload functions
   const handleAvatarClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
 
-// src/pages/profile/Profile.jsx
-// Sửa lại hàm upload avatar
-
-
-const handleAvatarUpload = async (event) => {
-  const file = event.target.files[0];
-  if (!file) return;
-  
-  const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
-  if (!validTypes.includes(file.type)) {
-    setErrorMessage('Chỉ chấp nhận file ảnh (JPEG, PNG, JPG, WEBP)');
-    setTimeout(() => setErrorMessage(''), 5000);
-    return;
-  }
-  
-  if (file.size > 5 * 1024 * 1024) {
-    setErrorMessage('Kích thước file quá lớn (tối đa 5MB)');
-    setTimeout(() => setErrorMessage(''), 5000);
-    return;
-  }
-  
-  try {
-    setUploading(true);
-    setErrorMessage('');
+  const handleAvatarUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
     
-    // Upload avatar mới
-    const result = await userService.uploadAvatar(user.username, file);
-    console.log('✅ New avatar uploaded:', result);
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setErrorMessage('Chỉ chấp nhận file ảnh (JPEG, PNG, JPG, WEBP)');
+      setTimeout(() => setErrorMessage(''), 5000);
+      return;
+    }
     
-    // Lấy lại avatar URL mới
-    const newAvatarUrl = await userService.getAvatarUrl(user.username);
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage('Kích thước file quá lớn (tối đa 5MB)');
+      setTimeout(() => setErrorMessage(''), 5000);
+      return;
+    }
     
-    // Cập nhật state user
-    setUser(prev => ({
-      ...prev,
-      avatar: newAvatarUrl
-    }));
-    
-    // Cập nhật localStorage
-    const storedUser = authService.getUser();
-    if (storedUser) {
-      authService.saveUser({
-        ...storedUser,
+    try {
+      setUploading(true);
+      setErrorMessage('');
+      
+      const result = await userService.uploadAvatar(user.username, file);
+      console.log('✅ New avatar uploaded:', result);
+      
+      const newAvatarUrl = await userService.getAvatarUrl(user.username);
+      
+      setUser(prev => ({
+        ...prev,
         avatar: newAvatarUrl
-      });
+      }));
+      
+      const storedUser = authService.getUser();
+      if (storedUser) {
+        authService.saveUser({
+          ...storedUser,
+          avatar: newAvatarUrl
+        });
+      }
+      
+      setSuccessMessage('Ảnh đại diện đã được cập nhật thành công!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      
+    } catch (error) {
+      console.error('❌ Error uploading avatar:', error);
+      setErrorMessage('Lỗi upload ảnh: ' + error.message);
+      setTimeout(() => setErrorMessage(''), 5000);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
-    
-    setSuccessMessage('Ảnh đại diện đã được cập nhật thành công!');
-    setTimeout(() => setSuccessMessage(''), 3000);
-    
-  } catch (error) {
-    console.error('❌ Error uploading avatar:', error);
-    setErrorMessage('Lỗi upload ảnh: ' + error.message);
-    setTimeout(() => setErrorMessage(''), 5000);
-  } finally {
-    setUploading(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  }
-};
-  // ========== HELPER FUNCTIONS ==========
+  };
 
+  // Helpers
   const formatDateOfBirth = (dateString) => {
     return userService.formatDateOfBirth(dateString);
   };
@@ -314,7 +313,6 @@ const handleAvatarUpload = async (event) => {
         onAvatarClick={handleAvatarClick}
       />
 
-      {/* File input ẩn cho upload avatar */}
       <input
         type="file"
         ref={fileInputRef}
@@ -630,7 +628,7 @@ const handleAvatarUpload = async (event) => {
                       fontSize: '12px', 
                       color: borrowStats.canBorrowMore ? '#10b981' : '#ef4444' 
                     }}>
-                      {borrowStats.canBorrowMore ? 'Có thể mượn thêm' : 'Đã đạt giới hạn'}
+                      {borrowStats.canBorrowMore ? '🟢 Có thể mượn thêm' : '🔴 Đã đạt giới hạn'}
                     </small>
                   )}
                 </div>

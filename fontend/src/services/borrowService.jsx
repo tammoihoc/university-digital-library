@@ -82,7 +82,24 @@ const borrowService = {
       throw error;
     }
   },
-
+async getAllBorrows() {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE}/all`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      },
+      credentials: 'include'
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching all borrows:', error);
+    return [];
+  }
+},
   async getUserBorrows(userId) {
     try {
       const token = localStorage.getItem('token');
@@ -116,10 +133,22 @@ const borrowService = {
         body: JSON.stringify(data)
       });
       
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        // Lấy message lỗi chi tiết từ server
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (e) {
+          // Nếu response không phải JSON, lấy text
+          errorMessage = await response.text() || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+      
       return await response.json();
     } catch (error) {
-      console.error('Error borrowing book:', error.message);
+      console.error('❌ Error borrowing book:', error.message);
       throw error;
     }
   }

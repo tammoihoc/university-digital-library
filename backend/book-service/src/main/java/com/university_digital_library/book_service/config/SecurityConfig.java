@@ -1,4 +1,4 @@
-// BookService/src/main/java/.../config/SecurityConfig.java
+// book-service/src/main/java/com/university_digital_library/book_service/config/SecurityConfig.java
 package com.university_digital_library.book_service.config;
 
 import com.university_digital_library.book_service.security.JwtAuthFilter;
@@ -14,7 +14,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true)  // ✅ QUAN TRỌNG: Phải có dòng này
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
     
     private final JwtAuthFilter jwtAuthFilter;

@@ -1,89 +1,127 @@
 package com.university_digital_library.user_service.model;
 
+import com.university_digital_library.common_library.security.EncryptedStringConverter;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.time.LocalDateTime;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "user_profiles")
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
 public class UserProfile {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @Column(unique = true, nullable = false)
+    @Column(unique = true, nullable = false, length = 50)
     private String username;
     
-    // AVATAR - THÊM CÁC TRƯỜNG ẢNH
-    private String avatarUrl;  // Ảnh đại diện chính
-    private String coverPhotoUrl;  // Ảnh bìa hồ sơ
-    
-    @ElementCollection
-    @CollectionTable(name = "user_gallery_images", joinColumns = @JoinColumn(name = "user_profile_id"))
-    @Column(name = "image_url")
-    private List<String> galleryImageUrls = new ArrayList<>();  // Ảnh trong gallery
-    
-    // Thông tin cá nhân
+    // 🔐 AES-256 ENCRYPTED FIELDS
+    @Convert(converter = EncryptedStringConverter.class)
     private String firstName;
+    
+    @Convert(converter = EncryptedStringConverter.class)
     private String lastName;
     
-    @Column(unique = true)
+    @Convert(converter = EncryptedStringConverter.class)
     private String email;
-    
+
+    // 🔎 BLIND INDEX: HMAC-SHA256(email) — không random như AES-GCM nên
+    // dùng để tra cứu (findByEmailHash) và ràng buộc UNIQUE thật sự hoạt
+    // động. Cột `email` phía trên chỉ dùng để lưu trữ/hiển thị, KHÔNG dùng
+    // trong mệnh đề WHERE nữa vì mỗi lần mã hóa ra ciphertext khác nhau.
+    @Column(name = "email_hash", unique = true, length = 64)
+    private String emailHash;
+
+    @Convert(converter = EncryptedStringConverter.class)
     private String phone;
+    
+    @Convert(converter = EncryptedStringConverter.class)
     private String address;
+    
+    @Convert(converter = EncryptedStringConverter.class)
+    private String studentId;
+
+    // 🔎 BLIND INDEX cho studentId — xem giải thích ở emailHash phía trên.
+    @Column(name = "student_id_hash", unique = true, length = 64)
+    private String studentIdHash;
+    
+    @Convert(converter = EncryptedStringConverter.class)
+    private String faculty;
+    
+    @Convert(converter = EncryptedStringConverter.class)
+    private String major;
+    
+    @Convert(converter = EncryptedStringConverter.class)
+    private String lecturerId;
+
+    // 🔎 BLIND INDEX cho lecturerId — xem giải thích ở emailHash phía trên.
+    @Column(name = "lecturer_id_hash", unique = true, length = 64)
+    private String lecturerIdHash;
+    
+    @Convert(converter = EncryptedStringConverter.class)
+    private String department;
+    
+    @Convert(converter = EncryptedStringConverter.class)
+    private String librarianId;
+    
+    // Non-encrypted fields
+    private String avatarUrl;
+    private String coverPhotoUrl;
     
     @Enumerated(EnumType.STRING)
     private UserType userType;
     
-    // Thông tin giới tính
     @Enumerated(EnumType.STRING)
     private Gender gender;
     
     private LocalDate dateOfBirth;
     private String nationality;
     
-    // Thông tin SINH VIÊN
-    @Column(unique = true)
-    private String studentId;
-    
-    private String faculty;
-    private String major;
     private Integer academicYear;
-    
-    // Thông tin GIẢNG VIÊN
-    private String lecturerId;
-    private String department;
     private String academicTitle;
-    
-    // Thông tin THỦ THƯ
-    private String librarianId;
     private String shift;
     private String position;
     
-    // Quản lý mượn sách
+    // Borrow management
+    @Builder.Default
     private Integer currentBorrowed = 0;
     
+    @Builder.Default
     private Integer totalBooksRead = 0;
     
-    // Thông tin tài khoản
+    @Builder.Default
+    private Integer maxBorrowLimit = 5;
+    
+    @Builder.Default
+    private Boolean isLocked = false;
+    
+    private LocalDateTime lockedUntil;
+    
+    @Builder.Default
     private Boolean isActive = true;
     
+    @CreatedDate
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+    
+    @LastModifiedDate
+    private LocalDateTime updatedAt;
+    
     private LocalDateTime lastLoginAt;
-    
-    private LocalDateTime createdAt = LocalDateTime.now();
-    
-    private LocalDateTime updatedAt = LocalDateTime.now();
     
     public enum UserType {
         STUDENT, LECTURER, LIBRARIAN, ADMIN
@@ -93,45 +131,20 @@ public class UserProfile {
         MALE, FEMALE, OTHER
     }
     
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-        if (isActive == null) isActive = true;
-        if (currentBorrowed == null) currentBorrowed = 0;
-        if (totalBooksRead == null) totalBooksRead = 0;
-        if (galleryImageUrls == null) galleryImageUrls = new ArrayList<>();
-    }
-    
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
-    
-    // Get full name
     public String getFullName() {
         return (lastName != null ? lastName + " " : "") + (firstName != null ? firstName : "");
     }
     
-    // Generate default avatar based on gender and name
-    public String getDefaultAvatar() {
-        if (avatarUrl != null && !avatarUrl.isEmpty()) {
-            return avatarUrl;
+    public boolean canBorrowMore() {
+        return !isLocked && currentBorrowed < maxBorrowLimit;
+    }
+    
+    public boolean isLocked() {
+        if (isLocked && lockedUntil != null && lockedUntil.isBefore(LocalDateTime.now())) {
+            // Auto-unlock if expired
+            isLocked = false;
+            lockedUntil = null;
         }
-        
-        // Tạo avatar mặc định dựa trên giới tính và tên
-        String baseUrl = "https://api.dicebear.com/7.x/";
-        String style = "avataaars";
-        
-        if (gender == Gender.FEMALE) {
-            style = "avataaars";
-        } else if (gender == Gender.MALE) {
-            style = "avataaars";
-        }
-        
-        return baseUrl + style + "/svg?seed=" + username + 
-               "&backgroundColor=b6e3f4,c0aede,d1d4f9" +
-               "&hairColor=2c1b18,4a312c,724133" +
-               "&clothingColor=262e33,5199e4,65c9ff";
+        return isLocked;
     }
 }

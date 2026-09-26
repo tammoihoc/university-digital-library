@@ -7,83 +7,69 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class IdGeneratorService {
     
-    private final UserProfileRepository userProfileRepository;
+    private final UserProfileRepository repository;
     
-    /**
-     * Tạo mã số tự động dựa vào loại user
-     * @param userType STUDENT, LECTURER, LIBRARIAN
-     * @return mã số tự động (SV-001, GV-001, TT-001)
-     */
     public String generateId(UserProfile.UserType userType) {
         String prefix;
-        String fieldToCheck;
+        String fieldName;
         
         switch (userType) {
             case STUDENT:
                 prefix = "SV";
-                fieldToCheck = "studentId";
+                fieldName = "studentId";
                 break;
             case LECTURER:
                 prefix = "GV";
-                fieldToCheck = "lecturerId";
+                fieldName = "lecturerId";
                 break;
             case LIBRARIAN:
                 prefix = "TT";
-                fieldToCheck = "librarianId";
+                fieldName = "librarianId";
                 break;
             default:
-                throw new IllegalArgumentException("Cannot generate ID for user type: " + userType);
+                throw new IllegalArgumentException("Cannot generate ID for type: " + userType);
         }
         
-        // Tìm số lớn nhất hiện có
-        int maxNumber = findMaxNumber(prefix, fieldToCheck);
+        int maxNumber = findMaxNumber(prefix, fieldName);
         int newNumber = maxNumber + 1;
         
-        String newId = String.format("%s-%03d", prefix, newNumber);
-        log.info("Generated new ID: {} for type: {}", newId, userType);
-        
-        return newId;
+        return String.format("%s-%03d", prefix, newNumber);
     }
     
-    /**
-     * Tìm số lớn nhất trong các ID hiện có
-     */
-    private int findMaxNumber(String prefix, String fieldToCheck) {
-        return userProfileRepository.findAll().stream()
-                .filter(profile -> {
-                    if (fieldToCheck.equals("studentId")) {
-                        return profile.getStudentId() != null && profile.getStudentId().startsWith(prefix);
-                    } else if (fieldToCheck.equals("lecturerId")) {
-                        return profile.getLecturerId() != null && profile.getLecturerId().startsWith(prefix);
-                    } else if (fieldToCheck.equals("librarianId")) {
-                        return profile.getLibrarianId() != null && profile.getLibrarianId().startsWith(prefix);
+    private int findMaxNumber(String prefix, String fieldName) {
+        List<UserProfile> users = repository.findAll();
+        int max = 0;
+        
+        for (UserProfile user : users) {
+            String id = null;
+            if (fieldName.equals("studentId")) {
+                id = user.getStudentId();
+            } else if (fieldName.equals("lecturerId")) {
+                id = user.getLecturerId();
+            } else if (fieldName.equals("librarianId")) {
+                id = user.getLibrarianId();
+            }
+            
+            if (id != null && id.startsWith(prefix)) {
+                try {
+                    String numberPart = id.substring(id.lastIndexOf("-") + 1);
+                    int num = Integer.parseInt(numberPart);
+                    if (num > max) {
+                        max = num;
                     }
-                    return false;
-                })
-                .mapToInt(profile -> {
-                    String id;
-                    if (fieldToCheck.equals("studentId")) {
-                        id = profile.getStudentId();
-                    } else if (fieldToCheck.equals("lecturerId")) {
-                        id = profile.getLecturerId();
-                    } else {
-                        id = profile.getLibrarianId();
-                    }
-                    
-                    try {
-                        // Lấy phần số sau dấu gạch ngang (SV-001 -> 1)
-                        String numberPart = id.substring(id.lastIndexOf("-") + 1);
-                        return Integer.parseInt(numberPart);
-                    } catch (Exception e) {
-                        return 0;
-                    }
-                })
-                .max()
-                .orElse(0);
+                } catch (Exception e) {
+                    // Ignore
+                }
+            }
+        }
+        
+        return max;
     }
 }

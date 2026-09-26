@@ -1,7 +1,7 @@
-// borrow-service/src/main/java/.../security/JwtAuthFilter.java
+// borrow-service/src/main/java/com/university_digital_library/borrow_service/security/JwtAuthFilter.java
 package com.university_digital_library.borrow_service.security;
 
-import com.university_digital_library.borrow_service.util.JwtUtil;
+import com.university_digital_library.common_library.security.JwtService;  // ✅ SỬA IMPORT
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class JwtAuthFilter extends OncePerRequestFilter {
     
-    private final JwtUtil jwtUtil;
+    private final JwtService jwtService;  // ✅ SỬA
     
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -36,76 +36,35 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         final String authHeader = request.getHeader("Authorization");
         
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            log.warn("No Bearer token found in request");
             filterChain.doFilter(request, response);
             return;
         }
         
         final String token = authHeader.substring(7);
-        log.info("Token received: {}...", token.substring(0, Math.min(50, token.length())));
         
         try {
-            if (jwtUtil.validateToken(token)) {
-                Claims claims = jwtUtil.getClaims(token);
-                String username = claims.getSubject();
-                log.info("Username from token: {}", username);
+            if (jwtService.validateToken(token)) {
+                String username = jwtService.extractUsername(token);
+                List<String> roles = jwtService.extractRoles(token);
                 
-                // LẤY ROLE TỪ TOKEN - KIỂM TRA CẢ 2 CÁCH
-                List<String> roles = null;
-                
-                // Cách 1: Lấy từ "roles"
-                if (claims.get("roles") != null) {
-                    roles = claims.get("roles", List.class);
-                    log.info("Roles from 'roles' claim: {}", roles);
-                }
-                // Cách 2: Lấy từ "authorities"
-                else if (claims.get("authorities") != null) {
-                    roles = claims.get("authorities", List.class);
-                    log.info("Roles from 'authorities' claim: {}", roles);
-                }
-                // Cách 3: Lấy từ "scope"
-                else if (claims.get("scope") != null) {
-                    String scope = claims.get("scope", String.class);
-                    roles = List.of(scope.split(" "));
-                    log.info("Roles from 'scope' claim: {}", roles);
-                }
-                
-                if (roles == null || roles.isEmpty()) {
-                    log.warn("No roles found in token for user: {}", username);
-                    filterChain.doFilter(request, response);
-                    return;
-                }
-                
-                // Tạo authorities với prefix ROLE_
                 List<SimpleGrantedAuthority> authorities = roles.stream()
-                        .map(role -> {
-                            String roleStr = role.toString();
-                            if (!roleStr.startsWith("ROLE_")) {
-                                return new SimpleGrantedAuthority("ROLE_" + roleStr);
-                            }
-                            return new SimpleGrantedAuthority(roleStr);
-                        })
-                        .collect(Collectors.toList());
+                    .map(role -> {
+                        if (!role.startsWith("ROLE_")) {
+                            return new SimpleGrantedAuthority("ROLE_" + role);
+                        }
+                        return new SimpleGrantedAuthority(role);
+                    })
+                    .collect(Collectors.toList());
                 
-                log.info("Authorities created for user {}: {}", username, authorities);
+                log.info("Borrow Service - Authenticating: {} with roles: {}", username, authorities);
                 
                 if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UsernamePasswordAuthenticationToken authToken =
-                            new UsernamePasswordAuthenticationToken(username, null, authorities);
+                        new UsernamePasswordAuthenticationToken(username, null, authorities);
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                    
-                    request.setAttribute("userId", username);
-                    String userType = authorities.stream()
-                            .map(a -> a.getAuthority().replace("ROLE_", ""))
-                            .findFirst()
-                            .orElse("STUDENT");
-                    request.setAttribute("userType", userType);
-                    
-                    log.info("Authenticated user: {} with role: {}", username, userType);
+                    log.info("✅ Borrow Service - User {} authenticated", username);
                 }
-            } else {
-                log.warn("Token validation failed");
             }
         } catch (Exception e) {
             log.error("JWT validation error: {}", e.getMessage());

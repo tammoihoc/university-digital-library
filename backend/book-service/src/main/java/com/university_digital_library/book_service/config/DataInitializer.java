@@ -39,7 +39,7 @@ public class DataInitializer {
                 // Thư viện Quận 9 - Cơ sở 2
                 branchRepository.save(LibraryBranch.builder()
                     .name("Thư viện HUTECH - Cơ sở Quận 9")
-                    .address("Tòa nhà E3 (Phòng E3.02.01), Khu Công nghệ cao, Quận 9, TP.HCM")
+                    .address("Tòa nhà E3 (Phòng E3.02.01), Khu Công nghệ cao, Thủ Đức, TP.HCM")
                     .openingHours("""
                         📅 Thứ 2 - Thứ 6: 8h00 - 16h15
                         📅 Thứ 7: 8h00 - 11h15

@@ -10,9 +10,11 @@ import BookGrid from '../../components/books/BookGrid';
 import StatsSection from '../../components/dashboard/StatsSection';
 import CategoriesSection from '../../components/dashboard/CategoriesSection';
 import EventsSection from '../../components/dashboard/EventsSection';
+import ReservationModal from '../../components/common/ReservationModal';
 import authService from '../../services/authService';
 import bookService from '../../services/bookService';
 import userService from '../../services/userService';
+import reservationService from '../../services/reservationService';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -34,13 +36,12 @@ const Dashboard = () => {
     monthlyReads: '156,234'
   });
 
-  // State đặt lịch - GIỮ LẠI MODAL NHƯNG XÓA DANH SÁCH HIỂN THỊ
+  // Reservation Modal States
   const [showReserveModal, setShowReserveModal] = useState(false);
   const [selectedReserveBook, setSelectedReserveBook] = useState(null);
-  const [reservePickupDate, setReservePickupDate] = useState('');
-  const [reserveNotes, setReserveNotes] = useState('');
   const [reserving, setReserving] = useState(false);
 
+  // Get available pickup dates
   const getAvailablePickupDates = () => {
     const dates = [];
     const today = new Date();
@@ -49,7 +50,8 @@ const Dashboard = () => {
       date.setDate(today.getDate() + i);
       dates.push({
         value: date.toISOString().split('T')[0],
-        label: `Ngày ${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`
+        label: `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`,
+        day: date.toLocaleDateString('vi-VN', { weekday: 'long' })
       });
     }
     return dates;
@@ -227,7 +229,8 @@ const Dashboard = () => {
         publicationYear: book.publicationYear,
         pages: book.pages,
         publisher: book.publisher,
-        department: book.department
+        department: book.department,
+        mainCoverImageUrl: book.mainCoverImageUrl || book.coverImageUrl
       };
     });
   };
@@ -254,58 +257,32 @@ const Dashboard = () => {
     const book = books.find(b => b.id === bookId);
     if (book) {
       setSelectedReserveBook(book);
-      setReservePickupDate(availableDates[0]?.value || '');
-      setReserveNotes('');
       setShowReserveModal(true);
     }
   };
 
-  const handleSubmitReservation = async () => {
-    if (!selectedReserveBook) {
-      alert('Vui lòng chọn sách');
-      return;
-    }
-    
-    try {
-      setReserving(true);
-      
-      const response = await fetch('http://localhost:8080/api/reservations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': user?.username || 'student',
-          'X-User-Type': 'STUDENT'
-        },
-        body: JSON.stringify({
-          bookId: selectedReserveBook.id,
-          notes: reserveNotes
-        })
-      });
-      
-      const responseText = await response.text();
-      
-      if (response.ok) {
-        alert(`✅ Đặt lịch thành công!\n📚 Sách: ${selectedReserveBook.title}\n📅 Ngày nhận: từ ngày mai\n⏰ Hạn: 7 ngày`);
-        setShowReserveModal(false);
-        setSelectedReserveBook(null);
-        await loadBooks();
-      } else {
-        let errorMessage = responseText;
-        try {
-          const errorJson = JSON.parse(responseText);
-          errorMessage = errorJson.message || errorJson;
-        } catch (e) {
-          errorMessage = responseText;
-        }
-        alert(`❌ Đặt lịch thất bại:\n${errorMessage}`);
-      }
-    } catch (error) {
-      console.error('Error reserving book:', error);
-      alert('❌ Đặt lịch thất bại: Không thể kết nối đến server');
-    } finally {
-      setReserving(false);
-    }
-  };
+const handleSubmitReservation = async (pickupDate, notes) => {
+  if (!selectedReserveBook) {
+    alert('Không có sách được chọn');
+    return;
+  }
+  setReserving(true);
+  try {
+    const result = await reservationService.createReservation(
+      selectedReserveBook.id,  // ✅ bookId
+      pickupDate,
+      notes
+    );
+    alert(`✅ Đặt lịch thành công! Sách "${selectedReserveBook.title}" sẽ được giữ đến ${new Date(result.expiryDate).toLocaleDateString('vi-VN')}`);
+    setShowReserveModal(false);
+    setSelectedReserveBook(null);
+    await loadBooks();
+  } catch (error) {
+    alert('❌ Đặt lịch thất bại: ' + error.message);
+  } finally {
+    setReserving(false);
+  }
+};
 
   const handleReadOnline = (bookId) => {
     const book = books.find(b => b.id === bookId);
@@ -380,75 +357,14 @@ const Dashboard = () => {
         <EventsSection />
       </main>
 
-      {/* Modal đặt lịch mượn */}
-      {showReserveModal && selectedReserveBook && (
-        <div className="modal-overlay" onClick={() => setShowReserveModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>📅 Đặt lịch mượn sách</h3>
-              <button className="close-btn" onClick={() => setShowReserveModal(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="book-info">
-                <h4>{selectedReserveBook.title}</h4>
-                <p className="author">{selectedReserveBook.author}</p>
-                <div className="availability-info">
-                  <span className="badge available">
-                    Còn {selectedReserveBook.availablePhysicalCopies || selectedReserveBook.physicalCopies - selectedReserveBook.borrowedCopies} bản
-                  </span>
-                </div>
-              </div>
-              
-              <div className="form-group">
-                <label>Ngày dự kiến đến nhận <span className="required">*</span></label>
-                <select 
-                  value={reservePickupDate}
-                  onChange={(e) => setReservePickupDate(e.target.value)}
-                  className="date-select"
-                  required
-                >
-                  {availableDates.map(date => (
-                    <option key={date.value} value={date.value}>
-                      {date.label}
-                    </option>
-                  ))}
-                </select>
-                <small className="hint-text">
-                  ⏰ Bạn có 7 ngày để đến nhận sách kể từ ngày đặt. Quá hạn sẽ tự động hủy.
-                </small>
-              </div>
-              
-              <div className="form-group">
-                <label>Ghi chú (tùy chọn)</label>
-                <textarea 
-                  rows="2"
-                  value={reserveNotes}
-                  onChange={(e) => setReserveNotes(e.target.value)}
-                  placeholder="Nhập ghi chú nếu có..."
-                  className="notes-input"
-                />
-              </div>
-              
-              <div className="reserve-info">
-                <p>📌 <strong>Lưu ý quan trọng:</strong></p>
-                <ul>
-                  <li>✅ Đặt lịch thành công sẽ <strong>tự động giữ sách</strong> cho bạn trong 7 ngày</li>
-                  <li>📅 Vui lòng đến thư viện trong vòng <strong>7 ngày</strong> kể từ ngày đặt</li>
-                  <li>⏰ Quá 7 ngày không đến nhận, đặt lịch sẽ <strong>tự động hủy</strong></li>
-                  <li>📖 Khi đến nhận, vui lòng thông báo mã đặt lịch cho thủ thư</li>
-                  <li>❌ Bạn có thể hủy đặt lịch bất kỳ lúc nào trước khi hết hạn</li>
-                </ul>
-              </div>
-            </div>
-            <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setShowReserveModal(false)}>Hủy</button>
-              <button className="btn-primary" onClick={handleSubmitReservation} disabled={reserving}>
-                {reserving ? 'Đang xử lý...' : 'Xác nhận đặt lịch'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ReservationModal
+        isOpen={showReserveModal}
+        onClose={() => setShowReserveModal(false)}
+        book={selectedReserveBook}
+        onSubmit={handleSubmitReservation}
+        isSubmitting={reserving}
+        availableDates={availableDates}
+      />
 
       <Footer />
     </div>

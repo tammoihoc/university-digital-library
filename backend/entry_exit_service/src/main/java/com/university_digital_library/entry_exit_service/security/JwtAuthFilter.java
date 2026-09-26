@@ -1,8 +1,7 @@
-// entry-exit-service/src/main/java/.../security/JwtAuthFilter.java
+// entry-exit-service/src/main/java/com/university_digital_library/entry_exit_service/security/JwtAuthFilter.java
 package com.university_digital_library.entry_exit_service.security;
 
-import com.university_digital_library.entry_exit_service.util.JwtUtil;
-import io.jsonwebtoken.Claims;
+import com.university_digital_library.common_library.security.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,7 +24,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class JwtAuthFilter extends OncePerRequestFilter {
     
-    private final JwtUtil jwtUtil;
+    private final JwtService jwtService;
     
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -36,7 +35,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         final String authHeader = request.getHeader("Authorization");
         
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            log.debug("No JWT token found for path: {}", request.getRequestURI());
             filterChain.doFilter(request, response);
             return;
         }
@@ -44,31 +42,29 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         final String token = authHeader.substring(7);
         
         try {
-            if (jwtUtil.validateToken(token)) {
-                Claims claims = jwtUtil.getClaims(token);
-                String username = claims.getSubject();
+            if (jwtService.validateToken(token)) {
+                String username = jwtService.extractUsername(token);
+                List<String> roles = jwtService.extractRoles(token);
                 
-                @SuppressWarnings("unchecked")
-                List<String> roles = claims.get("roles", List.class);
+                // ✅ THÊM PREFIX ROLE_ NẾU CHƯA CÓ
                 List<SimpleGrantedAuthority> authorities = roles.stream()
-                        .map(role -> {
-                            if (!role.startsWith("ROLE_")) {
-                                return new SimpleGrantedAuthority("ROLE_" + role);
-                            }
-                            return new SimpleGrantedAuthority(role);
-                        })
-                        .collect(Collectors.toList());
+                    .map(role -> {
+                        if (!role.startsWith("ROLE_")) {
+                            return new SimpleGrantedAuthority("ROLE_" + role);
+                        }
+                        return new SimpleGrantedAuthority(role);
+                    })
+                    .collect(Collectors.toList());
+                
+                log.info("Entry-Exit Service - Authenticating: {} with roles: {}", username, authorities);
                 
                 if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UsernamePasswordAuthenticationToken authToken =
-                            new UsernamePasswordAuthenticationToken(username, null, authorities);
+                        new UsernamePasswordAuthenticationToken(username, null, authorities);
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                     
-                    request.setAttribute("userId", username);
-                    request.setAttribute("userRole", roles);
-                    
-                    log.debug("Authenticated user: {} with roles: {}", username, roles);
+                    log.debug("Entry-Exit authenticated user: {}", username);
                 }
             }
         } catch (Exception e) {
@@ -76,12 +72,5 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
         
         filterChain.doFilter(request, response);
-    }
-    
-    @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-        return path.equals("/health") || 
-               path.equals("/actuator/health");
     }
 }
